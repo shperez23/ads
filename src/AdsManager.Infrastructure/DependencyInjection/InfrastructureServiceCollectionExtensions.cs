@@ -5,7 +5,7 @@ using AdsManager.Infrastructure.Integrations.Meta;
 using AdsManager.Infrastructure.Persistence;
 using AdsManager.Infrastructure.Security;
 using Hangfire;
-using Hangfire.SqlServer;
+using Hangfire.PostgreSql;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -34,17 +34,13 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<InsightsSyncJob>();
 
         services.AddHangfire(config => config
-            .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
-            .UseSimpleAssemblyNameTypeSerializer()
-            .UseRecommendedSerializerSettings()
-            .UseSqlServerStorage(connectionString, new SqlServerStorageOptions
-            {
-                CommandBatchMaxTimeout = TimeSpan.FromMinutes(5),
-                SlidingInvisibilityTimeout = TimeSpan.FromMinutes(5),
-                QueuePollInterval = TimeSpan.FromSeconds(15),
-                UseRecommendedIsolationLevel = true,
-                DisableGlobalLocks = true
-            }));
+         .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+         .UseSimpleAssemblyNameTypeSerializer()
+         .UseRecommendedSerializerSettings()
+         .UsePostgreSqlStorage(options =>
+         {
+             options.UseNpgsqlConnection(connectionString);
+         }));
 
         services.AddHangfireServer();
 
