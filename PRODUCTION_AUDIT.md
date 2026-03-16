@@ -1,200 +1,243 @@
-# Auditoría técnica de estado — AdsManager backend
+# Auditoría arquitectónica completa — AdsManager
 
-## 1) Arquitectura actual inferida
+## 1) Arquitectura actual
 
-### Estilo arquitectónico
-El proyecto implementa una **arquitectura por capas / clean modular monolith** con separación explícita:
+### Capas existentes
+- **Presentación (API)**: controladores REST, middlewares, configuración auth/autorización, registro de jobs recurrentes y exposición de Swagger/Hangfire.
+- **Aplicación (Application)**: servicios de casos de uso, interfaces/puertos, DTOs, validadores FluentValidation y modelo `Result<T>`.
+- **Dominio (Domain)**: entidades de negocio, enums y contrato `ITenantScoped`.
+- **Infraestructura (Infrastructure)**: EF Core (DbContext, configuraciones y migraciones), repositorios, seguridad (JWT/hash/cifrado), integraciones con Meta API, cache y background jobs.
 
-- `AdsManager.API`: capa de presentación HTTP (controllers, middlewares, configuración auth/authorization, Swagger, Hangfire dashboard).
-- `AdsManager.Application`: casos de uso (services), contratos (`Interfaces`), DTOs, validaciones, mapeos y modelo `Result<T>`.
-- `AdsManager.Domain`: entidades, enums y contratos de dominio (`ITenantScoped`).
-- `AdsManager.Infrastructure`: persistencia EF Core, migraciones, repositorios, integraciones Meta, seguridad, background jobs, cache y métricas.
+### Patrones identificados
+- **Arquitectura en capas tipo Clean/Onion (monolito modular)**.
+- **Ports & Adapters ligero** (`Application.Interfaces` + implementaciones en `Infrastructure`).
+- **Repository pattern** para acceso a datos por agregado (`CampaignRepository`, `AdSetRepository`, etc.).
+- **Cross-cutting middleware** (trace, tenant, excepción global).
+- **Background processing** con Hangfire para sync y reglas.
+- **Multi-tenant por claim + global query filter**.
 
-### Patrones observados
-- **DI + interfaces por puerto** entre aplicación e infraestructura.
-- **Repositorio por agregado funcional** (`CampaignRepository`, `AdSetRepository`, etc.).
-- **Cross-cutting middleware** (trace + manejo global de excepciones + resolución de tenant/user).
-- **Jobs asíncronos** con Hangfire para sincronización de datos y evaluación de reglas.
-- **Filtro global multitenant** en EF para entidades `ITenantScoped`.
+### Módulos implementados
+- Auth + refresh token.
+- RBAC por políticas.
+- Campaigns, AdSets, Ads, AdAccounts.
+- MetaConnections.
+- Integración Meta Ads (lectura/escritura/sync).
+- Insights, Reports y Dashboard.
+- Rules engine base y ejecución programada.
+- Audit logs + API logs.
+- Métricas internas y cache en memoria.
 
-## 2) Estado actual por capacidad solicitada
+---
 
-### Cobertura funcional (sí/no/parcial)
+## 2) Partes incompletas o parciales
 
-| Capacidad | Estado | Evidencia / nota rápida |
-|---|---|---|
-| Auth seguro | **Parcial alto** | JWT con validación fuerte + refresh tokens hasheados + BCrypt; falta hardening adicional (rate limiting, MFA, lockout). |
-| Multi-tenant | **Sí (base sólida)** | Tenant/User resueltos por middleware y filtros globales EF por `TenantId`. |
-| Campaigns | **Sí** | Controlador y servicio dedicados + sync + acciones de estado. |
-| Adsets | **Sí** | Controlador/servicio y jobs de sync. |
-| Ads | **Sí** | Controlador/servicio y jobs de sync. |
-| Adaccounts | **Sí** | Controlador/servicio y sincronización. |
-| Metaconnections | **Sí** | Gestión de conexión, validación de permisos y refresh de token. |
-| Sync jobs | **Sí** | Jobs recurrentes Hangfire para campañas/adsets/ads/insights/tokens/reglas. |
-| Dashboard | **Sí** | Endpoint dedicado + servicio con cache. |
-| Reports | **Sí** | Endpoint insights + filtros por fechas/campaña/account. |
-| Audit logs | **Sí** | Entidad + servicio de auditoría con `TraceId`. |
-| API logs | **Sí (parcial)** | Persistencia de logs en integraciones Meta y refresh token job (no uniforme en toda llamada externa). |
-| Caching | **Sí (inicial)** | `IMemoryCache` con claves por prefijo; listo para migrar a Redis. |
-| RBAC | **Sí (estático)** | Políticas por permisos y mapa role→permission en código. |
-| Rules engine base | **Sí** | Entidades/migración + RuleEvaluationJob + acciones base (pause/alert). |
+- **Persistencia**: sólida en estructura, pero faltan estrategias operativas de retención/particionado para tablas de alto crecimiento (`ApiLogs`, `InsightDaily`, `RuleExecutionLogs`).
+- **Repositorios**: existen, pero no hay una capa clara de especificaciones/paginación reusable para consultas de alto volumen.
+- **Servicios**: cubren CRUD y sync base, faltan capacidades avanzadas de optimización y automatización de negocio.
+- **Sincronización**: hay jobs por entidad, pero sin control distribuido de concurrencia (riesgo de solape en múltiples réplicas).
+- **Auditoría**: existe `AuditLog`, pero no toda acción crítica parece auditarse de forma uniforme.
+- **Seguridad**: falta rate limiting, lockout, MFA y hardening de exposición operativa (Swagger/Hangfire).
+- **Optimización de consultas**: no hay paginación estándar ni contratos de query avanzados en listados.
+- **Multi-tenant**: base correcta por claim, pero no hay evidencia de jerarquía avanzada de tenant/subtenant o partición física por tenant.
 
-## 3) Hallazgos por categoría
+---
 
-## Seguridad
+## 3) Funcionalidades faltantes para un Ads Manager completo
 
-### Fortalezas
-- Validación estricta de JWT (issuer/audience/signing/lifetime, clock skew controlado).
-- Secret key obligatoria en producción (falla startup si no está configurada).
-- Password hashing con BCrypt.
-- Refresh token almacenado hasheado (SHA-256 + comparación constant-time).
-- Cifrado de secretos con Data Protection para access tokens externos.
-- Políticas de autorización por permiso en endpoints críticos.
+Aunque hay cobertura relevante, para acercarse a un Business Manager completo faltan:
 
-### Huecos para producción
-1. **Sin rate limiting/bot protection** en `login`, `refresh`, `register`.
-2. **Sin estrategia de lockout** por intentos fallidos.
-3. **Sin MFA / step-up auth** para operaciones sensibles.
-4. **Sin rotación/versionado explícito de claves JWT** (key rollover).
-5. **Fallback riesgoso al desencriptar secretos**: si falla `Unprotect`, retorna el valor original (podría ocultar corrupción de datos).
-6. **Swagger expuesto sin condicionarlo por entorno**.
-7. **Hangfire dashboard expuesto** (aunque autorizado); falta endurecimiento de red/IP y SSO.
+- **AdSets management avanzado**: templates, clonación, presupuestos por reglas, validación de solapes de audiencias.
+- **Ads management avanzado**: versiones de creatividades, biblioteca de assets, estados de revisión/moderación.
+- **MetaConnection management enterprise**: health scoring, reconnect UX/API, rotación segura de secretos y trazabilidad completa de cambios.
+- **AdAccounts storage enriquecido**: metadatos financieros (moneda, timezone operativo, límites), ownership y permisos granulares por usuario.
+- **Campaign sync incremental robusto**: manejo explícito de borrados/archivados remotos, reconciliación y retry por lotes.
+- **Insights sync enterprise**: ventanas deslizantes, backfill histórico parametrizable, deduplicación avanzada y retry selectivo.
+- **Background jobs resilientes**: colas por prioridad, backoff configurable por tipo de error y exclusión mutua distribuida.
+- **Rules engine avanzado**: condiciones compuestas, scheduling por regla, simulación dry-run, acciones multi-paso.
+- **Campaign optimization**: recomendaciones automáticas, budget pacing, alertas inteligentes y aprendizaje sobre performance histórica.
 
-## Performance
+---
 
-### Fortalezas
-- Uso consistente de `AsNoTracking` en queries de lectura.
-- Cache para dashboard/reportes con TTL configurable.
-- Índices en migraciones para consultas críticas (insights/logs/rules).
-- Reintentos + timeout + circuit breaker en integración Meta.
+## 4) Problemas de arquitectura detectados
 
-### Huecos
-1. **Cache local in-memory** no compartida entre instancias.
-2. **Sin paginación estándar** en listados grandes (campaigns/adsets/ads/reports).
-3. **Riesgo N+1 / loops de sync** por consultas por entidad dentro de iteraciones.
-4. **Sin compresión HTTP explícita** ni políticas de tamaño de payload.
+- **Acoplamiento API↔servicios**: controladores repiten validación de tenant (`if !_tenantProvider... Unauthorized`) en casi todos los endpoints.
+- **Dependencia directa fuerte de Meta API**: el servicio integra sync, mapping, resiliencia, logging y persistencia en una sola clase extensa.
+- **DTO/errores**: patrón `Result<T>` consistente, pero falta estandarización formal tipo `problem+json` para errores HTTP.
+- **Validaciones parciales**: hay validadores en auth/ads/adsets/rules, pero no cobertura homogénea en todos los contratos expuestos.
+- **Gobernanza RBAC estática**: mapa rol-permiso hardcodeado, difícil evolución multi-tenant dinámica.
 
-## Escalabilidad
+---
 
-### Fortalezas
-- Jobs desacoplados por tipo de sync.
-- Separación clara por capas facilita extraer servicios en el futuro.
+## 5) Problemas de seguridad
 
-### Huecos
-1. **Estado de cache no distribuido** (bloquea scale-out real).
-2. **No hay partición de colas Hangfire por prioridad/criticidad**.
-3. **Sin control de concurrencia distribuida** para evitar ejecuciones solapadas en multi-réplica.
-4. **Sin estrategia explícita de particionado/retención de tablas de alto crecimiento** (`ApiLogs`, `InsightDaily`, `RuleExecutionLogs`).
+- **Access tokens externos**: se cifran, pero `Decrypt` hace fallback silencioso devolviendo texto original si falla el descifrado.
+- **JWT**: configuración robusta base, pero sin esquema de rotación/versionado explícito de claves.
+- **Endpoints sensibles sin antiabuso**: `register/login/refresh` carecen de rate limiting/lockout.
+- **Exposición operativa**: Swagger y Hangfire habilitados globalmente; faltan restricciones por entorno/red.
+- **Tenant control**: está basado en claims; correcto para baseline, pero requiere reforzar validaciones de pertenencia para escenarios complejos B2B enterprise.
 
-## Mantenibilidad
+---
 
-### Fortalezas
-- Organización limpia por proyecto/capa.
-- Contratos claros en `Application.Interfaces`.
-- Convenciones de DTO/validators consistentes.
+## 6) Problemas de escalabilidad
 
-### Huecos
-1. **RBAC hardcodeado** en mapa estático; difícil gobernanza por tenant.
-2. **No se observan pruebas automatizadas** (unit/integration/e2e de API).
-3. **No se observan health checks/readiness probes**.
-4. **No se observa versionado de API** (v1/v2 formal) más allá de swagger doc name.
+- **Consultas potencialmente pesadas**: listados de insights y entidades sin paginación.
+- **Cache no distribuida**: `IMemoryCache` limita el scale-out horizontal.
+- **Sincronización intensiva**: loops por entidad/cuenta con riesgo de latencia acumulada y presión de DB en grandes volúmenes.
+- **HttpClient**: se usa `IHttpClientFactory` correctamente, pero faltaría estrategia explícita multi-tenant de throttling/pooling y observabilidad de consumo por cuenta.
 
-## Observabilidad
+---
 
-### Fortalezas
-- Serilog con `TraceId` enriquecido.
-- Middleware de excepción global con correlación.
-- Métricas custom (`meta_api_latency_ms`, `sync_duration_ms`, etc.).
-- Persistencia de `AuditLog` y `ApiLog`.
+## 7) Endpoints que deberían existir (o reforzarse)
 
-### Huecos
-1. **No se ve exportador OpenTelemetry/Prometheus** listo para scraping.
-2. **Sin SLO/alertas** formalizadas (latencia, error budget, backlog de jobs).
-3. **Api logs no homogéneos** para todas las integraciones externas.
-4. **Sin endpoint health/metrics documentado** para operaciones.
+### Ya existen
+- `api/adsets`, `api/adsets/{id}`
+- `api/ads`, `api/ads/{id}`
+- `api/meta/connections`
+- `api/adaccounts`
 
-## Experiencia de integración frontend
+### Recomendados faltantes para completitud
+- `GET /api/adaccounts/{id}` y `PUT /api/adaccounts/{id}` (detalle/edición).
+- `POST /api/adaccounts/{id}/link-meta-connection` (vinculación explícita).
+- `POST /api/campaigns/{id}/duplicate` (operación frecuente real).
+- `POST /api/adsets/{id}/duplicate`.
+- `POST /api/ads/{id}/duplicate`.
+- `GET /api/meta/connections/{id}/health` (health check puntual).
+- `POST /api/meta/connections/{id}/reconnect` (flujo operacional explícito).
+- `GET /api/sync/jobs` y `POST /api/sync/jobs/{jobName}/run` (operación controlada de sync).
+- `GET /api/audit-logs` y `GET /api/api-logs` (solo admin, con filtros y paginación).
 
-### Fortalezas
-- DTOs tipados y estructura uniforme con `Result<T>`.
-- Swagger con esquema Bearer habilitado.
-- Endpoints por dominio (`/campaigns`, `/adsets`, `/ads`, `/reports`, `/dashboard`, `/rules`).
+---
 
-### Huecos
-1. **Contratos de error no estandarizados** (códigos semánticos, `problem+json`).
-2. **Sin paginación/ordenamiento/filtros enriquecidos** en listados.
-3. **Sin idempotency keys** para operaciones sensibles `POST/PUT`.
-4. **Sin política CORS visible en `Program.cs`** (puede frenar integración SPA).
+## 8) Entidades de base de datos (objetivo)
 
-## 4) Confirmación puntual del checklist solicitado
+### Ya implementadas
+- `Tenant`, `User`, `Role`
+- `MetaConnection`
+- `AdAccount`, `Campaign`, `AdSet`, `Ad`
+- `InsightDaily`
+- `AuditLog`, `ApiLog`
+- `RefreshToken`
+- `SyncCursor`, `SyncJobRun`
+- `Rule`, `RuleExecutionLog`
 
-- Auth seguro: **PARCIAL ALTO** (base sólida, faltan controles anti abuso y hardening avanzado).
-- Multi-tenant: **SÍ**.
-- Campaigns: **SÍ**.
-- Adsets: **SÍ**.
-- Ads: **SÍ**.
-- Adaccounts: **SÍ**.
-- Metaconnections: **SÍ**.
-- Sync jobs: **SÍ**.
-- Dashboard: **SÍ**.
-- Reports: **SÍ**.
-- Audit logs: **SÍ**.
-- API logs: **SÍ (PARCIAL)**.
-- Caching: **SÍ (BÁSICO)**.
-- RBAC: **SÍ (ESTÁTICO)**.
-- Rules engine base: **SÍ**.
+### Sugeridas adicionales
+- `Permission`, `RolePermission` (RBAC dinámico).
+- `UserAdAccountPermission` (autorización granular por cuenta).
+- `CampaignBudgetHistory` (histórico de cambios de presupuesto/estado).
+- `CreativeAsset` (repositorio de creatividades).
+- `SyncError` (errores de sync trazables y reintentables).
+- `WebhookEvent` (si se incorpora ingestión near-real-time de Meta).
 
-## 5) Checklist final de producción (go-live)
+---
 
-### Seguridad
-- [ ] Rate limit + protection anti brute-force en auth endpoints.
-- [ ] Lockout progresivo + auditoría de intentos fallidos.
-- [ ] MFA para cuentas admin y acciones críticas.
-- [ ] Rotación de secretos/keys y estrategia de key rollover JWT.
-- [ ] Endurecer Data Protection key ring (persistencia segura + rotación).
-- [ ] Restringir Swagger/Hangfire por entorno/red/SSO.
-- [ ] Revisión OWASP ASVS (mínimo nivel L2).
+## 9) Jobs recomendados
 
-### Plataforma / operación
-- [ ] Health checks (`/health/live`, `/health/ready`).
-- [ ] Exportación de métricas (OTel/Prometheus) + dashboards.
-- [ ] Alertas (errores 5xx, latencia p95, fallos Hangfire, circuit abierto).
-- [ ] Política de retención y archivado para logs/insights.
+### Ya existen
+- `SyncCampaignsJob`
+- `SyncAdSetsJob`
+- `SyncAdsJob`
+- `SyncInsightsJob`
+- `RefreshMetaTokenJob`
+- `RuleEvaluationJob`
 
-### Datos / performance
-- [ ] Cache distribuida (Redis) con invalidación por tenant.
-- [ ] Paginación + orden + filtros en endpoints de listado.
-- [ ] Pruebas de carga en reportes y sync jobs.
-- [ ] Índices validados con plan de ejecución real en PostgreSQL.
+### Recomendados para madurez
+- `SyncAdAccountsJob` dedicado y recurrente.
+- `BackfillInsightsJob` parametrizable por rango de fechas.
+- `ReconcileDeletedEntitiesJob` (estado local vs remoto).
+- `AuditRetentionJob` y `ApiLogRetentionJob`.
+- `CacheInvalidationJob` para dashboards críticos.
 
-### Calidad / entrega
-- [ ] Tests unitarios de servicios críticos (auth, rules, reports).
-- [ ] Tests de integración API + DB + auth/tenant filters.
-- [ ] Contratos OpenAPI congelados y versionados.
-- [ ] Pipeline CI/CD con quality gates (build, tests, análisis estático, migraciones).
+---
 
-## 6) Roadmap final de cierre
+## 10) Plan de implementación por fases
 
-### Fase 1 (0–2 semanas) — Hardening crítico
-1. Rate limiting + lockout en auth.
-2. Cerrar exposición de Swagger/Hangfire (solo entornos permitidos).
-3. Health checks + alertas mínimas de operación.
-4. Estandarizar errores API (`problem+json`) y contrato frontend.
+### FASE 1 — Arquitectura
+1. Estandarizar errores (`problem+json`) y contratos API.
+2. Extraer componentes de integración Meta (cliente, mapeo, persistencia) para reducir clase monolítica.
+3. Consolidar middleware/filtros para evitar repetición de chequeo tenant en controladores.
 
-### Fase 2 (2–4 semanas) — Escala y confiabilidad
-1. Migrar cache a Redis.
-2. Paginación y filtros avanzados en listados/reportes.
-3. Concurrencia controlada en jobs (single execution por tenant/job window).
-4. Política de retención de `ApiLogs`, `AuditLogs`, `InsightDaily`.
+### FASE 2 — Persistencia
+1. Incorporar paginación/ordenamiento/filtros en endpoints de listado.
+2. Agregar entidades de permisos granulares y tablas de histórico operacional.
+3. Definir políticas de retención/archivado para tablas de crecimiento rápido.
 
-### Fase 3 (4–6 semanas) — Gobernanza y calidad
-1. Suite de tests automáticos (unit + integration + smoke).
-2. RBAC configurable (tabla de permisos por rol/tenant).
-3. Observabilidad completa (métricas exportables + trazas distribuidas).
-4. Preparación de release checklist + runbooks de incidentes.
+### FASE 3 — Integración Meta
+1. Endpoints de salud/reconexión de MetaConnections.
+2. Reforzar manejo de tokens y rotación de secretos.
+3. Mejorar trazabilidad de fallos externos por tipo y severidad.
 
-## 7) Veredicto de auditoría
+### FASE 4 — Sincronización
+1. Concurrencia distribuida para jobs (evitar ejecuciones solapadas).
+2. Jobs de reconciliación y backfill.
+3. Reintentos por lote y estrategias de retry selectivo.
 
-El backend está en **estado funcional avanzado** y cubre la mayoría de capacidades core del negocio. No obstante, para declararlo **production-ready enterprise**, aún faltan controles de hardening de seguridad, observabilidad operativa completa, y capacidades de escalado horizontal (cache distribuida + disciplina de jobs + pruebas de carga).
+### FASE 5 — Dashboard avanzado
+1. Métricas derivadas y comparativas (WoW/MoM).
+2. Alertas inteligentes y recomendaciones de optimización.
+3. Segmentación multi-cuenta con agregaciones rápidas.
 
-**Conclusión:** listo para **pilot/staging robusto**; requiere el roadmap de cierre para **go-live de producción con riesgo controlado**.
+### FASE 6 — Optimización
+1. Migrar cache a Redis distribuido.
+2. Añadir OpenTelemetry/Prometheus + SLO/alertas.
+3. Pruebas de carga y tuning de índices/planes de ejecución.
+
+---
+
+## 11) Diagrama de arquitectura objetivo
+
+```text
+[Frontend Angular]
+        |
+        v
+   [API .NET]
+        |
+        v
+    [Application Services]
+        |
+        v
+     [Repositories]
+        |
+        v
+     [PostgreSQL]
+```
+
+```text
+[API .NET]
+    |
+    v
+[MetaAdsService / MetaConnector Layer]
+    |
+    v
+[Meta Marketing API]
+```
+
+### Vista ideal extendida
+```text
+Angular SPA
+   |
+   v
+API Gateway / BFF (opcional)
+   |
+   v
+AdsManager.API
+   |------------------------------|
+   v                              v
+Application Services         Background Jobs (Hangfire)
+   |                              |
+   v                              v
+Repositories / UoW          Sync Orchestrator + Rules Engine
+   |                              |
+   v                              v
+PostgreSQL <----------------> Redis Cache
+   |
+   v
+Observability Stack (Logs, Metrics, Traces)
+
+AdsManager.API --> Meta Connector --> Meta Marketing API
+```
+
+---
+
+## Resumen ejecutivo
+
+El proyecto está **bien encaminado y funcionalmente avanzado** (campaigns, adsets, ads, adaccounts, metaconnections, reportes, dashboard, sync y reglas base). Para un nivel enterprise similar a Meta Business Manager, el mayor gap está en **hardening de seguridad, escalabilidad distribuida, madurez operativa de sincronización y capacidades avanzadas de optimización publicitaria**.
