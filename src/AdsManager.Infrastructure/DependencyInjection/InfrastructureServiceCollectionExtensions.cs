@@ -37,6 +37,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddHttpClient<IMetaAdsService, MetaAdsService>();
         services.AddHttpClient<IMetaConnectionApiClient, MetaConnectionApiClient>();
         services.AddScoped<ICampaignRepository, CampaignRepository>();
+        services.AddScoped<IAdAccountRepository, AdAccountRepository>();
         services.AddScoped<IAdSetRepository, AdSetRepository>();
         services.AddScoped<IAdRepository, AdRepository>();
         services.AddScoped<IInsightRepository, InsightRepository>();

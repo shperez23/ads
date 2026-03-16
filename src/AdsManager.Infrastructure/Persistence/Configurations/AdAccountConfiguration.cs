@@ -17,6 +17,10 @@ public sealed class AdAccountConfiguration : IEntityTypeConfiguration<AdAccount>
         builder.Property(x => x.TimezoneName).HasMaxLength(100).IsRequired();
         builder.Property(x => x.Status).HasMaxLength(50).IsRequired();
 
+
+        builder.HasIndex(x => x.MetaAccountId);
+        builder.HasIndex(x => x.TenantId);
+
         builder.HasIndex(x => new { x.TenantId, x.MetaAccountId }).IsUnique();
     }
 }

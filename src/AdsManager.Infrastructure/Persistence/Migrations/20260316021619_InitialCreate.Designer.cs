@@ -126,6 +126,10 @@ namespace AdsManager.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("MetaAccountId");
+
+                    b.HasIndex("TenantId");
+
                     b.HasIndex("TenantId", "MetaAccountId")
                         .IsUnique();
 

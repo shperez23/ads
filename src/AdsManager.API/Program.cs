@@ -31,6 +31,7 @@ builder.Services.AddScoped<ITenantProvider, TenantProvider>();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ICampaignService, CampaignService>();
+builder.Services.AddScoped<IAdAccountService, AdAccountService>();
 builder.Services.AddScoped<IAdSetService, AdSetService>();
 builder.Services.AddScoped<IAdsService, AdsService>();
 builder.Services.AddScoped<IReportService, ReportService>();

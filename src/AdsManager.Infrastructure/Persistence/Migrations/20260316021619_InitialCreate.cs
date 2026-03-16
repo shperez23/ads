@@ -313,6 +313,16 @@ namespace AdsManager.Infrastructure.Persistence.Migrations
                 });
 
             migrationBuilder.CreateIndex(
+                name: "IX_AdAccounts_MetaAccountId",
+                table: "AdAccounts",
+                column: "MetaAccountId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_AdAccounts_TenantId",
+                table: "AdAccounts",
+                column: "TenantId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_AdAccounts_TenantId_MetaAccountId",
                 table: "AdAccounts",
                 columns: new[] { "TenantId", "MetaAccountId" },
