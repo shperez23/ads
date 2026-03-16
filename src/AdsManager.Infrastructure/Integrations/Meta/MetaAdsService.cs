@@ -189,19 +189,31 @@ public sealed class MetaAdsService : IMetaAdsService
     public Task UpdateAdStatusAsync(Guid tenantId, MetaAdStatusUpdateRequest request, CancellationToken cancellationToken = default)
         => PostAsync(tenantId, request.AdId, new Dictionary<string, string> { ["status"] = request.Status }, cancellationToken);
 
-    public Task<IReadOnlyCollection<MetaInsightDto>> GetInsightsAsync(Guid tenantId, string adAccountId, DateOnly since, DateOnly until, CancellationToken cancellationToken = default)
-        => GetDataAsync(tenantId,
-            $"act_{adAccountId}/insights?fields=date_start,date_stop,campaign_id,campaign_name,spend,impressions,clicks,ctr&time_range={{\"since\":\"{since:yyyy-MM-dd}\",\"until\":\"{until:yyyy-MM-dd}\"}}&level=campaign",
+    public Task<IReadOnlyCollection<MetaInsightDto>> GetInsightsAsync(Guid tenantId, string adAccountId, DateOnly since, DateOnly until, string level = "campaign", CancellationToken cancellationToken = default)
+    {
+        var effectiveLevel = level is "campaign" or "adset" or "ad" ? level : "campaign";
+
+        return GetDataAsync(tenantId,
+            $"act_{adAccountId}/insights?fields=date_start,date_stop,campaign_id,campaign_name,adset_id,adset_name,ad_id,ad_name,spend,impressions,reach,clicks,ctr,cpc,cpm,actions&time_range={{\"since\":\"{since:yyyy-MM-dd}\",\"until\":\"{until:yyyy-MM-dd}\"}}&level={effectiveLevel}",
             e => new MetaInsightDto(
                 e.TryGetProperty("date_start", out var dateStart) ? dateStart.GetString() ?? string.Empty : string.Empty,
                 e.TryGetProperty("date_stop", out var dateStop) ? dateStop.GetString() ?? string.Empty : string.Empty,
                 e.TryGetProperty("campaign_id", out var campaignId) ? campaignId.GetString() ?? string.Empty : string.Empty,
                 e.TryGetProperty("campaign_name", out var campaignName) ? campaignName.GetString() ?? string.Empty : string.Empty,
+                e.TryGetProperty("adset_id", out var adSetId) ? adSetId.GetString() ?? string.Empty : string.Empty,
+                e.TryGetProperty("adset_name", out var adSetName) ? adSetName.GetString() ?? string.Empty : string.Empty,
+                e.TryGetProperty("ad_id", out var adId) ? adId.GetString() ?? string.Empty : string.Empty,
+                e.TryGetProperty("ad_name", out var adName) ? adName.GetString() ?? string.Empty : string.Empty,
                 e.TryGetProperty("spend", out var spend) ? spend.GetString() ?? "0" : "0",
                 e.TryGetProperty("impressions", out var impressions) ? impressions.GetString() ?? "0" : "0",
+                e.TryGetProperty("reach", out var reach) ? reach.GetString() ?? "0" : "0",
                 e.TryGetProperty("clicks", out var clicks) ? clicks.GetString() ?? "0" : "0",
-                e.TryGetProperty("ctr", out var ctr) ? ctr.GetString() ?? "0" : "0"),
+                ParseLinkClicks(e).ToString(CultureInfo.InvariantCulture),
+                e.TryGetProperty("ctr", out var ctr) ? ctr.GetString() ?? "0" : "0",
+                e.TryGetProperty("cpc", out var cpc) ? cpc.GetString() ?? "0" : "0",
+                e.TryGetProperty("cpm", out var cpm) ? cpm.GetString() ?? "0" : "0"),
             cancellationToken);
+    }
 
     public async Task SyncCampaignsAsync(Guid tenantId, string adAccountId, CancellationToken cancellationToken = default)
     {
@@ -354,24 +366,62 @@ public sealed class MetaAdsService : IMetaAdsService
         var effectiveSince = cursorDate > since ? cursorDate : since;
 
         var adAccount = await GetAdAccountAsync(tenantId, adAccountId, cancellationToken);
-        var insights = await GetInsightsAsync(tenantId, adAccountId, effectiveSince, until, cancellationToken);
+        var campaignInsights = await GetInsightsAsync(tenantId, adAccountId, effectiveSince, until, "campaign", cancellationToken);
+        var adSetInsights = await GetInsightsAsync(tenantId, adAccountId, effectiveSince, until, "adset", cancellationToken);
+        var adInsights = await GetInsightsAsync(tenantId, adAccountId, effectiveSince, until, "ad", cancellationToken);
 
+        var campaignsByMetaId = await _dbContext.Campaigns
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.AdAccountId == adAccount.Id)
+            .ToDictionaryAsync(x => x.MetaCampaignId, cancellationToken);
+
+        var adSetsByMetaId = await _dbContext.AdSets
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantId)
+            .ToDictionaryAsync(x => x.MetaAdSetId, cancellationToken);
+
+        var adsByMetaId = await _dbContext.Ads
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantId)
+            .ToDictionaryAsync(x => x.MetaAdId, cancellationToken);
+
+        await UpsertInsightsAsync(campaignInsights, adAccount.Id, tenantId, campaignsByMetaId, adSetsByMetaId, adsByMetaId, cancellationToken);
+        await UpsertInsightsAsync(adSetInsights, adAccount.Id, tenantId, campaignsByMetaId, adSetsByMetaId, adsByMetaId, cancellationToken);
+        await UpsertInsightsAsync(adInsights, adAccount.Id, tenantId, campaignsByMetaId, adSetsByMetaId, adsByMetaId, cancellationToken);
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        await UpdateSyncCursorAsync(cursor, cancellationToken);
+    }
+
+
+    private async Task UpsertInsightsAsync(
+        IReadOnlyCollection<MetaInsightDto> insights,
+        Guid adAccountId,
+        Guid tenantId,
+        IReadOnlyDictionary<string, Campaign> campaignsByMetaId,
+        IReadOnlyDictionary<string, AdSet> adSetsByMetaId,
+        IReadOnlyDictionary<string, Ad> adsByMetaId,
+        CancellationToken cancellationToken)
+    {
         foreach (var insight in insights)
         {
             if (!DateOnly.TryParse(insight.DateStart, out var date))
                 continue;
 
-            var campaign = await _dbContext.Campaigns
-                .AsNoTracking()
-                .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.MetaCampaignId == insight.CampaignId, cancellationToken);
+            campaignsByMetaId.TryGetValue(insight.CampaignId, out var campaign);
+            adSetsByMetaId.TryGetValue(insight.AdSetId, out var adSet);
+            adsByMetaId.TryGetValue(insight.AdId, out var ad);
 
-            if (campaign is null)
-                continue;
+            var campaignId = campaign?.Id;
+            var adSetId = adSet?.Id;
+            var adId = ad?.Id;
 
             var existing = await _dbContext.InsightsDaily.FirstOrDefaultAsync(x =>
                 x.TenantId == tenantId &&
-                x.AdAccountId == adAccount.Id &&
-                x.CampaignId == campaign.Id &&
+                x.AdAccountId == adAccountId &&
+                x.CampaignId == campaignId &&
+                x.AdSetId == adSetId &&
+                x.AdId == adId &&
                 x.Date == date,
                 cancellationToken);
 
@@ -380,30 +430,53 @@ public sealed class MetaAdsService : IMetaAdsService
                 _dbContext.InsightsDaily.Add(new InsightDaily
                 {
                     TenantId = tenantId,
-                    AdAccountId = adAccount.Id,
-                    CampaignId = campaign?.Id,
+                    AdAccountId = adAccountId,
+                    CampaignId = campaignId,
+                    AdSetId = adSetId,
+                    AdId = adId,
                     Date = date,
                     Impressions = TryParseLong(insight.Impressions),
                     Clicks = TryParseLong(insight.Clicks),
-                    Reach = 0,
-                    LinkClicks = 0,
+                    Reach = TryParseLong(insight.Reach),
+                    LinkClicks = TryParseLong(insight.LinkClicks),
                     Spend = TryParseDecimal(insight.Spend),
                     Ctr = TryParseDecimal(insight.Ctr),
-                    Cpc = 0,
-                    Cpm = 0
+                    Cpc = TryParseDecimal(insight.Cpc),
+                    Cpm = TryParseDecimal(insight.Cpm)
                 });
             }
             else
             {
                 existing.Impressions = TryParseLong(insight.Impressions);
                 existing.Clicks = TryParseLong(insight.Clicks);
+                existing.Reach = TryParseLong(insight.Reach);
+                existing.LinkClicks = TryParseLong(insight.LinkClicks);
                 existing.Spend = TryParseDecimal(insight.Spend);
                 existing.Ctr = TryParseDecimal(insight.Ctr);
+                existing.Cpc = TryParseDecimal(insight.Cpc);
+                existing.Cpm = TryParseDecimal(insight.Cpm);
             }
         }
+    }
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
-        await UpdateSyncCursorAsync(cursor, cancellationToken);
+    private static long ParseLinkClicks(JsonElement element)
+    {
+        if (!element.TryGetProperty("actions", out var actions) || actions.ValueKind != JsonValueKind.Array)
+            return 0;
+
+        foreach (var action in actions.EnumerateArray())
+        {
+            if (!action.TryGetProperty("action_type", out var type) || type.GetString() != "link_click")
+                continue;
+
+            if (!action.TryGetProperty("value", out var value))
+                continue;
+
+            if (long.TryParse(value.GetString(), NumberStyles.Any, CultureInfo.InvariantCulture, out var parsed))
+                return parsed;
+        }
+
+        return 0;
     }
 
     private async Task<IReadOnlyCollection<T>> GetDataAsync<T>(Guid tenantId, string endpoint, Func<JsonElement, T> mapper, CancellationToken cancellationToken)

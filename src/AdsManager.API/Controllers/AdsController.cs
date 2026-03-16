@@ -13,10 +13,12 @@ public sealed class AdsController : ControllerBase
 {
     private readonly IAdsService _adsService;
     private readonly ITenantProvider _tenantProvider;
+    private readonly IReportService _reportService;
 
-    public AdsController(IAdsService adsService, ITenantProvider tenantProvider)
+    public AdsController(IAdsService adsService, IReportService reportService, ITenantProvider tenantProvider)
     {
         _adsService = adsService;
+        _reportService = reportService;
         _tenantProvider = tenantProvider;
     }
 
@@ -40,6 +42,16 @@ public sealed class AdsController : ControllerBase
         return result.Success ? Ok(result) : NotFound(result);
     }
 
+
+    [HttpGet("{id:guid}/insights")]
+    public async Task<IActionResult> GetInsightsByAd([FromRoute] Guid id, [FromQuery] DateOnly? dateFrom, [FromQuery] DateOnly? dateTo, CancellationToken cancellationToken)
+    {
+        if (!_tenantProvider.GetTenantId().HasValue)
+            return Unauthorized();
+
+        var result = await _reportService.GetAdInsightsAsync(id, dateFrom, dateTo, cancellationToken);
+        return result.Success ? Ok(result) : NotFound(result);
+    }
 
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateAdRequest request, CancellationToken cancellationToken)

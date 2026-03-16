@@ -13,10 +13,12 @@ public sealed class AdSetsController : ControllerBase
 {
     private readonly IAdSetService _adSetService;
     private readonly ITenantProvider _tenantProvider;
+    private readonly IReportService _reportService;
 
-    public AdSetsController(IAdSetService adSetService, ITenantProvider tenantProvider)
+    public AdSetsController(IAdSetService adSetService, IReportService reportService, ITenantProvider tenantProvider)
     {
         _adSetService = adSetService;
+        _reportService = reportService;
         _tenantProvider = tenantProvider;
     }
 
@@ -40,6 +42,16 @@ public sealed class AdSetsController : ControllerBase
         return result.Success ? Ok(result) : NotFound(result);
     }
 
+
+    [HttpGet("{id:guid}/insights")]
+    public async Task<IActionResult> GetInsightsByAdSet([FromRoute] Guid id, [FromQuery] DateOnly? dateFrom, [FromQuery] DateOnly? dateTo, CancellationToken cancellationToken)
+    {
+        if (!_tenantProvider.GetTenantId().HasValue)
+            return Unauthorized();
+
+        var result = await _reportService.GetAdSetInsightsAsync(id, dateFrom, dateTo, cancellationToken);
+        return result.Success ? Ok(result) : NotFound(result);
+    }
 
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateAdSetRequest request, CancellationToken cancellationToken)
