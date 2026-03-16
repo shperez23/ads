@@ -8,6 +8,8 @@ namespace AdsManager.API.Controllers;
 
 [ApiController]
 [Authorize]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/dashboard")]
 [Route("api/dashboard")]
 public sealed class DashboardController : ControllerBase
 {

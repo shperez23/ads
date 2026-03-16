@@ -9,6 +9,8 @@ namespace AdsManager.API.Controllers;
 
 [ApiController]
 [Authorize]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/adaccounts")]
 [Route("api/adaccounts")]
 public sealed class AdAccountsController : ControllerBase
 {
