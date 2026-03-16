@@ -88,7 +88,7 @@ public sealed class MetaAdsController : ControllerBase
     }
 
     [HttpGet("ad-accounts/{adAccountId}/insights")]
-    public async Task<IActionResult> GetInsights([FromRoute] string adAccountId, [FromQuery] DateOnly since, [FromQuery] DateOnly until, CancellationToken cancellationToken)
+    public async Task<IActionResult> GetInsights([FromRoute] string adAccountId, [FromQuery] DateOnly since, [FromQuery] DateOnly until, [FromQuery] string? level, CancellationToken cancellationToken)
     {
         var tenantId = _tenantProvider.GetTenantId();
         if (!tenantId.HasValue)
@@ -97,7 +97,7 @@ public sealed class MetaAdsController : ControllerBase
         if (since > until)
             throw new ValidationException("La fecha since no puede ser mayor que until.");
 
-        var result = await _metaAdsService.GetInsightsAsync(tenantId.Value, adAccountId, since, until, cancellationToken);
+        var result = await _metaAdsService.GetInsightsAsync(tenantId.Value, adAccountId, since, until, level ?? "campaign", cancellationToken);
         return Ok(result);
     }
 }
