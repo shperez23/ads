@@ -16,33 +16,44 @@ public sealed class CampaignService : ICampaignService
     private readonly ICampaignRepository _campaignRepository;
     private readonly IApplicationDbContext _dbContext;
     private readonly IMetaAdsService _metaAdsService;
+    private readonly ITenantProvider _tenantProvider;
 
-    public CampaignService(ICampaignRepository campaignRepository, IApplicationDbContext dbContext, IMetaAdsService metaAdsService)
+    public CampaignService(ICampaignRepository campaignRepository, IApplicationDbContext dbContext, IMetaAdsService metaAdsService, ITenantProvider tenantProvider)
     {
         _campaignRepository = campaignRepository;
         _dbContext = dbContext;
         _metaAdsService = metaAdsService;
+        _tenantProvider = tenantProvider;
     }
 
-    public async Task<Result<IReadOnlyCollection<CampaignDto>>> GetAllAsync(Guid tenantId, CancellationToken cancellationToken = default)
+    public async Task<Result<IReadOnlyCollection<CampaignDto>>> GetAllAsync(CancellationToken cancellationToken = default)
     {
+        if (!TryGetTenantId(out var tenantId))
+            return Result<IReadOnlyCollection<CampaignDto>>.Fail("Tenant no resuelto");
+
         var campaigns = await _campaignRepository.GetByTenantAsync(tenantId, cancellationToken);
         return Result<IReadOnlyCollection<CampaignDto>>.Ok(campaigns.Select(Map).ToArray());
     }
 
-    public async Task<Result<CampaignDto>> GetByIdAsync(Guid tenantId, Guid campaignId, CancellationToken cancellationToken = default)
+    public async Task<Result<CampaignDto>> GetByIdAsync(Guid campaignId, CancellationToken cancellationToken = default)
     {
+        if (!TryGetTenantId(out var tenantId))
+            return Result<CampaignDto>.Fail("Tenant no resuelto");
+
         var campaign = await _campaignRepository.GetByIdAsync(tenantId, campaignId, cancellationToken);
         return campaign is null
             ? Result<CampaignDto>.Fail("Campaña no encontrada")
             : Result<CampaignDto>.Ok(Map(campaign));
     }
 
-    public async Task<Result<CampaignDto>> CreateAsync(Guid tenantId, CreateCampaignRequest request, CancellationToken cancellationToken = default)
+    public async Task<Result<CampaignDto>> CreateAsync(CreateCampaignRequest request, CancellationToken cancellationToken = default)
     {
+        if (!TryGetTenantId(out var tenantId))
+            return Result<CampaignDto>.Fail("Tenant no resuelto");
+
         var adAccount = await _dbContext.AdAccounts
             .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.Id == request.AdAccountId, cancellationToken);
+            .FirstOrDefaultAsync(x => x.Id == request.AdAccountId, cancellationToken);
 
         if (adAccount is null)
             return Result<CampaignDto>.Fail("Ad account no encontrada para el tenant");
@@ -64,12 +75,15 @@ public sealed class CampaignService : ICampaignService
         };
 
         await _campaignRepository.AddAsync(campaign, cancellationToken);
-        await WriteAuditLogAsync(tenantId, null, "create campaign", nameof(Campaign), campaign.Id.ToString(), campaign, cancellationToken);
+        await WriteAuditLogAsync(tenantId, _tenantProvider.GetUserId(), "create campaign", nameof(Campaign), campaign.Id.ToString(), campaign, cancellationToken);
         return Result<CampaignDto>.Ok(Map(campaign), "Campaña creada correctamente");
     }
 
-    public async Task<Result<CampaignDto>> UpdateAsync(Guid tenantId, Guid campaignId, UpdateCampaignRequest request, CancellationToken cancellationToken = default)
+    public async Task<Result<CampaignDto>> UpdateAsync(Guid campaignId, UpdateCampaignRequest request, CancellationToken cancellationToken = default)
     {
+        if (!TryGetTenantId(out var tenantId))
+            return Result<CampaignDto>.Fail("Tenant no resuelto");
+
         var campaign = await _campaignRepository.GetByIdAsync(tenantId, campaignId, cancellationToken);
         if (campaign is null)
             return Result<CampaignDto>.Fail("Campaña no encontrada");
@@ -83,18 +97,21 @@ public sealed class CampaignService : ICampaignService
         campaign.EndDate = request.EndDate;
 
         await _campaignRepository.UpdateAsync(campaign, cancellationToken);
-        await WriteAuditLogAsync(tenantId, null, "update campaign", nameof(Campaign), campaign.Id.ToString(), request, cancellationToken);
+        await WriteAuditLogAsync(tenantId, _tenantProvider.GetUserId(), "update campaign", nameof(Campaign), campaign.Id.ToString(), request, cancellationToken);
         return Result<CampaignDto>.Ok(Map(campaign), "Campaña actualizada correctamente");
     }
 
-    public Task<Result<CampaignDto>> PauseAsync(Guid tenantId, Guid campaignId, Guid? userId, CancellationToken cancellationToken = default)
-        => ChangeStatusAsync(tenantId, campaignId, "PAUSED", userId, cancellationToken);
+    public Task<Result<CampaignDto>> PauseAsync(Guid campaignId, CancellationToken cancellationToken = default)
+        => ChangeStatusAsync(campaignId, "PAUSED", cancellationToken);
 
-    public Task<Result<CampaignDto>> ActivateAsync(Guid tenantId, Guid campaignId, Guid? userId, CancellationToken cancellationToken = default)
-        => ChangeStatusAsync(tenantId, campaignId, "ACTIVE", userId, cancellationToken);
+    public Task<Result<CampaignDto>> ActivateAsync(Guid campaignId, CancellationToken cancellationToken = default)
+        => ChangeStatusAsync(campaignId, "ACTIVE", cancellationToken);
 
-    private async Task<Result<CampaignDto>> ChangeStatusAsync(Guid tenantId, Guid campaignId, string status, Guid? userId, CancellationToken cancellationToken)
+    private async Task<Result<CampaignDto>> ChangeStatusAsync(Guid campaignId, string status, CancellationToken cancellationToken)
     {
+        if (!TryGetTenantId(out var tenantId))
+            return Result<CampaignDto>.Fail("Tenant no resuelto");
+
         var campaign = await _campaignRepository.GetByIdAsync(tenantId, campaignId, cancellationToken);
         if (campaign is null)
             return Result<CampaignDto>.Fail("Campaña no encontrada");
@@ -103,9 +120,15 @@ public sealed class CampaignService : ICampaignService
 
         campaign.Status = status;
         await _campaignRepository.UpdateAsync(campaign, cancellationToken);
-        await WriteAuditLogAsync(tenantId, userId, status == "PAUSED" ? "pause campaign" : "update campaign", nameof(Campaign), campaign.Id.ToString(), new { campaign.Status }, cancellationToken);
+        await WriteAuditLogAsync(tenantId, _tenantProvider.GetUserId(), status == "PAUSED" ? "pause campaign" : "update campaign", nameof(Campaign), campaign.Id.ToString(), new { campaign.Status }, cancellationToken);
 
         return Result<CampaignDto>.Ok(Map(campaign), $"Estado actualizado a {status}");
+    }
+
+    private bool TryGetTenantId(out Guid tenantId)
+    {
+        tenantId = _tenantProvider.GetTenantId() ?? Guid.Empty;
+        return tenantId != Guid.Empty;
     }
 
     private static CampaignDto Map(Campaign campaign) =>

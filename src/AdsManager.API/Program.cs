@@ -1,6 +1,8 @@
 using System.Text;
 using AdsManager.Application.Interfaces;
 using AdsManager.Application.Interfaces.Services;
+using AdsManager.API.Middleware;
+using AdsManager.API.Services;
 using AdsManager.Application.Mappings;
 using AdsManager.Application.Services;
 using AdsManager.Application.Validators.Auth;
@@ -24,6 +26,8 @@ builder.Host.UseSerilog((ctx, cfg) =>
         .Enrich.FromLogContext()
         .WriteTo.Console());
 
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ITenantProvider, TenantProvider>();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ICampaignService, CampaignService>();
@@ -88,12 +92,13 @@ using (var scope = app.Services.CreateScope())
     dbContext.Database.Migrate();
 }
 
-app.UseMiddleware<AdsManager.API.Middlewares.GlobalExceptionMiddleware>();
+app.UseMiddleware<GlobalExceptionMiddleware>();
 app.UseSwagger();
 app.UseSwaggerUI();
 
 app.UseSerilogRequestLogging();
 app.UseAuthentication();
+app.UseMiddleware<TenantMiddleware>();
 app.UseAuthorization();
 
 app.UseHangfireDashboard("/hangfire");

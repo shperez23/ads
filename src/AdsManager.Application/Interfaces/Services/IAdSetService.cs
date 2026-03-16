@@ -5,5 +5,5 @@ namespace AdsManager.Application.Interfaces.Services;
 
 public interface IAdSetService
 {
-    Task<Result<AdSetDto>> CreateAsync(Guid tenantId, Guid? userId, CreateAdSetRequest request, CancellationToken cancellationToken = default);
+    Task<Result<AdSetDto>> CreateAsync(CreateAdSetRequest request, CancellationToken cancellationToken = default);
 }

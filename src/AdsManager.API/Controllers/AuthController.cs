@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using AdsManager.Application.DTOs.Auth;
 using AdsManager.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
@@ -11,10 +10,12 @@ namespace AdsManager.API.Controllers;
 public sealed class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
+    private readonly ITenantProvider _tenantProvider;
 
-    public AuthController(IAuthService authService)
+    public AuthController(IAuthService authService, ITenantProvider tenantProvider)
     {
         _authService = authService;
+        _tenantProvider = tenantProvider;
     }
 
     [HttpPost("register")]
@@ -45,10 +46,11 @@ public sealed class AuthController : ControllerBase
     [Authorize]
     public async Task<IActionResult> Me(CancellationToken cancellationToken)
     {
-        if (!Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub"), out var userId))
+        var userId = _tenantProvider.GetUserId();
+        if (!userId.HasValue)
             return Unauthorized();
 
-        var result = await _authService.GetCurrentUserAsync(userId, cancellationToken);
+        var result = await _authService.GetCurrentUserAsync(userId.Value, cancellationToken);
         return result.Success ? Ok(result) : NotFound(result);
     }
 }

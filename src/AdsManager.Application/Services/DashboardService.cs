@@ -9,15 +9,20 @@ namespace AdsManager.Application.Services;
 public sealed class DashboardService : IDashboardService
 {
     private readonly IApplicationDbContext _dbContext;
+    private readonly ITenantProvider _tenantProvider;
 
-    public DashboardService(IApplicationDbContext dbContext)
+    public DashboardService(IApplicationDbContext dbContext, ITenantProvider tenantProvider)
     {
         _dbContext = dbContext;
+        _tenantProvider = tenantProvider;
     }
 
-    public async Task<Result<DashboardDto>> GetDashboardAsync(Guid tenantId, DashboardFilter filter, CancellationToken cancellationToken = default)
+    public async Task<Result<DashboardDto>> GetDashboardAsync(DashboardFilter filter, CancellationToken cancellationToken = default)
     {
-        var query = _dbContext.InsightsDaily.AsNoTracking().Where(x => x.TenantId == tenantId);
+        if (!_tenantProvider.GetTenantId().HasValue)
+            return Result<DashboardDto>.Fail("Tenant no resuelto");
+
+        var query = _dbContext.InsightsDaily.AsNoTracking();
 
         if (filter.DateFrom.HasValue)
             query = query.Where(x => x.Date >= filter.DateFrom.Value);
@@ -42,7 +47,6 @@ public sealed class DashboardService : IDashboardService
 
         var topCampaigns = await _dbContext.Campaigns
             .AsNoTracking()
-            .Where(x => x.TenantId == tenantId)
             .Join(insights.Where(x => x.CampaignId.HasValue), c => c.Id, i => i.CampaignId!.Value,
                 (campaign, insight) => new { campaign.Id, campaign.Name, insight.Spend, insight.Clicks, insight.Impressions })
             .GroupBy(x => new { x.Id, x.Name })
