@@ -13,6 +13,7 @@ using AdsManager.Infrastructure.Security;
 using FluentValidation;
 using FluentValidation.AspNetCore;
 using Hangfire;
+using Hangfire.Dashboard;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -42,6 +43,7 @@ builder.Services.AddValidatorsFromAssemblyContaining<RegisterRequestValidator>()
 builder.Services.AddFluentValidationAutoValidation();
 
 var jwt = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
+jwt.SecretKey = Environment.GetEnvironmentVariable("ADSMANAGER_JWT_SECRET") ?? jwt.SecretKey;
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -103,7 +105,10 @@ app.UseAuthentication();
 app.UseMiddleware<TenantMiddleware>();
 app.UseAuthorization();
 
-app.UseHangfireDashboard("/hangfire");
+app.UseHangfireDashboard("/hangfire", new DashboardOptions
+{
+    Authorization = [new HangfireAdminAuthorizationFilter()]
+});
 RecurringJob.AddOrUpdate<SyncCampaignsJob>("sync-campaigns-6-hours", job => job.ExecuteAsync(default), "0 */6 * * *");
 RecurringJob.AddOrUpdate<SyncInsightsJob>("sync-insights-24-hours", job => job.ExecuteAsync(default), Cron.Daily);
 
