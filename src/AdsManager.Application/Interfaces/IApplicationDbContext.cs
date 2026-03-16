@@ -14,6 +14,7 @@ public interface IApplicationDbContext
     DbSet<Campaign> Campaigns { get; }
     DbSet<AdSet> AdSets { get; }
     DbSet<Ad> Ads { get; }
+    DbSet<InsightDaily> InsightDaily { get; }
     DbSet<InsightDaily> InsightsDaily { get; }
     DbSet<AuditLog> AuditLogs { get; }
     DbSet<ApiLog> ApiLogs { get; }

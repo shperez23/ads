@@ -1,8 +1,10 @@
 using AdsManager.Application.Interfaces;
 using AdsManager.Application.Interfaces.Meta;
+using AdsManager.Application.Interfaces.Repositories;
 using AdsManager.Infrastructure.Background;
 using AdsManager.Infrastructure.Integrations.Meta;
 using AdsManager.Infrastructure.Persistence;
+using AdsManager.Infrastructure.Persistence.Repositories;
 using AdsManager.Infrastructure.Security;
 using Hangfire;
 using Hangfire.PostgreSql;
@@ -31,6 +33,11 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
 
         services.AddHttpClient<IMetaAdsService, MetaAdsService>();
+        services.AddScoped<ICampaignRepository, CampaignRepository>();
+        services.AddScoped<IAdSetRepository, AdSetRepository>();
+        services.AddScoped<IAdRepository, AdRepository>();
+        services.AddScoped<IInsightRepository, InsightRepository>();
+
         services.AddScoped<InsightsSyncJob>();
 
         services.AddHangfire(config => config

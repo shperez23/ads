@@ -21,6 +21,7 @@ public abstract class AppDbContext<TContext> : DbContext, IApplicationDbContext
     public DbSet<Campaign> Campaigns => Set<Campaign>();
     public DbSet<AdSet> AdSets => Set<AdSet>();
     public DbSet<Ad> Ads => Set<Ad>();
+    public DbSet<InsightDaily> InsightDaily => Set<InsightDaily>();
     public DbSet<InsightDaily> InsightsDaily => Set<InsightDaily>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<ApiLog> ApiLogs => Set<ApiLog>();

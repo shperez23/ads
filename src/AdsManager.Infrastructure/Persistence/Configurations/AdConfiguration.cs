@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace AdsManager.Infrastructure.Persistence.Configurations;
 
-public sealed class AdsConfiguration : IEntityTypeConfiguration<Ad>
+public sealed class AdConfiguration : IEntityTypeConfiguration<Ad>
 {
     public void Configure(EntityTypeBuilder<Ad> builder)
     {

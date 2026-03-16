@@ -1,5 +1,6 @@
 using System.Text;
 using AdsManager.Application.Interfaces;
+using AdsManager.Application.Interfaces.Services;
 using AdsManager.Application.Mappings;
 using AdsManager.Application.Services;
 using AdsManager.Application.Validators.Auth;
@@ -25,6 +26,10 @@ builder.Host.UseSerilog((ctx, cfg) =>
 
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<ICampaignService, CampaignService>();
+builder.Services.AddScoped<IAdSetService, AdSetService>();
+builder.Services.AddScoped<IAdsService, AdsService>();
+builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddAutoMapper(cfg => cfg.AddProfile<AuthMappingProfile>());
 builder.Services.AddValidatorsFromAssemblyContaining<RegisterRequestValidator>();
 builder.Services.AddFluentValidationAutoValidation();
