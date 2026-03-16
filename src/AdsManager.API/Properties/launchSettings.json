@@ -5,7 +5,7 @@
       "launchBrowser": true,
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "ADSMANAGER_JWT_SECRET": "dev_only_change_me_32_chars_minimum_secret_key"
+        "ADSMANAGER_JWT_SECRET": "MCowBQYDK2VwAyEAMGrziAHrYqxgVn+yGb/niO5mhdTgQwZUIXrWnrTMjt8="
       },
       "applicationUrl": "https://localhost:61570;http://localhost:61571"
     }
