@@ -27,16 +27,20 @@ public sealed class MetaAdsService : IMetaAdsService
     private readonly IApplicationDbContext _dbContext;
     private readonly ILogger<MetaAdsService> _logger;
     private readonly ISecretEncryptionService _secretEncryptionService;
+    private readonly ITenantProvider _tenantProvider;
+    private readonly IObservabilityMetrics _observabilityMetrics;
     private readonly AsyncRetryPolicy<HttpResponseMessage> _retryPolicy;
     private readonly AsyncCircuitBreakerPolicy _circuitBreakerPolicy;
     private readonly AsyncTimeoutPolicy<HttpResponseMessage> _timeoutPolicy;
 
-    public MetaAdsService(HttpClient httpClient, IApplicationDbContext dbContext, ILogger<MetaAdsService> logger, ISecretEncryptionService secretEncryptionService)
+    public MetaAdsService(HttpClient httpClient, IApplicationDbContext dbContext, ILogger<MetaAdsService> logger, ISecretEncryptionService secretEncryptionService, ITenantProvider tenantProvider, IObservabilityMetrics observabilityMetrics)
     {
         _httpClient = httpClient;
         _dbContext = dbContext;
         _logger = logger;
         _secretEncryptionService = secretEncryptionService;
+        _tenantProvider = tenantProvider;
+        _observabilityMetrics = observabilityMetrics;
         _httpClient.BaseAddress = new Uri(BaseUrl);
 
         _retryPolicy = Policy<HttpResponseMessage>
@@ -516,6 +520,12 @@ public sealed class MetaAdsService : IMetaAdsService
         finally
         {
             stopwatch.Stop();
+            _observabilityMetrics.RecordMetaApiLatency(stopwatch.Elapsed.TotalMilliseconds, endpoint, method, status);
+            if (status != "Success")
+            {
+                _observabilityMetrics.RecordMetaApiError(endpoint, method, status);
+            }
+
             await LogApiAsync(endpoint, method, request, responseBody, statusCode, status, stopwatch.ElapsedMilliseconds, cancellationToken);
         }
     }
@@ -627,7 +637,8 @@ public sealed class MetaAdsService : IMetaAdsService
             ResponseJson = responseJson,
             StatusCode = statusCode,
             Status = status,
-            DurationMs = durationMs
+            DurationMs = durationMs,
+            TraceId = _tenantProvider.GetTraceId()
         });
 
         await _dbContext.SaveChangesAsync(cancellationToken);

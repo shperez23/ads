@@ -4,4 +4,5 @@ public interface ITenantProvider
 {
     Guid? GetTenantId();
     Guid? GetUserId();
+    string GetTraceId();
 }

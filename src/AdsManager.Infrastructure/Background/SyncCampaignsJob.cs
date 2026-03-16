@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using AdsManager.Application.Interfaces;
 using AdsManager.Domain.Entities;
 using AdsManager.Application.Interfaces.Meta;
@@ -12,16 +13,19 @@ public sealed class SyncCampaignsJob
     private readonly IApplicationDbContext _dbContext;
     private readonly IMetaAdsService _metaAdsService;
     private readonly ILogger<SyncCampaignsJob> _logger;
+    private readonly IObservabilityMetrics _observabilityMetrics;
 
-    public SyncCampaignsJob(IApplicationDbContext dbContext, IMetaAdsService metaAdsService, ILogger<SyncCampaignsJob> logger)
+    public SyncCampaignsJob(IApplicationDbContext dbContext, IMetaAdsService metaAdsService, ILogger<SyncCampaignsJob> logger, IObservabilityMetrics observabilityMetrics)
     {
         _dbContext = dbContext;
         _metaAdsService = metaAdsService;
         _logger = logger;
+        _observabilityMetrics = observabilityMetrics;
     }
 
     public async Task ExecuteAsync(CancellationToken cancellationToken = default)
     {
+        var stopwatch = Stopwatch.StartNew();
         var run = new SyncJobRun
         {
             JobName = "SyncCampaignsJob",
@@ -49,11 +53,13 @@ public sealed class SyncCampaignsJob
             }
 
             run.Status = "Succeeded";
+            _observabilityMetrics.RecordSyncDuration(run.JobName, stopwatch.Elapsed.TotalMilliseconds, run.Status);
         }
         catch (Exception ex)
         {
             run.Status = "Failed";
             run.Error = ex.Message;
+            _observabilityMetrics.RecordSyncDuration(run.JobName, stopwatch.Elapsed.TotalMilliseconds, "Failed");
             _logger.LogError(ex, "SyncCampaignsJob failed");
             throw;
         }
