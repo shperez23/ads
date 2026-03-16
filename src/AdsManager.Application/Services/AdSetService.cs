@@ -28,13 +28,32 @@ public sealed class AdSetService : IAdSetService
         _tenantProvider = tenantProvider;
     }
 
-    public async Task<Result<AdSetDto>> CreateAsync(CreateAdSetRequest request, CancellationToken cancellationToken = default)
+    public async Task<Result<IReadOnlyCollection<AdSetDto>>> GetAdSetsAsync(CancellationToken cancellationToken = default)
     {
-        var tenantId = _tenantProvider.GetTenantId();
-        if (!tenantId.HasValue)
+        if (!TryGetTenantId(out var tenantId))
+            return Result<IReadOnlyCollection<AdSetDto>>.Fail("Tenant no resuelto");
+
+        var adSets = await _adSetRepository.GetByTenantAsync(tenantId, cancellationToken);
+        return Result<IReadOnlyCollection<AdSetDto>>.Ok(adSets.Select(Map).ToArray());
+    }
+
+    public async Task<Result<AdSetDto>> GetAdSetByIdAsync(Guid adSetId, CancellationToken cancellationToken = default)
+    {
+        if (!TryGetTenantId(out var tenantId))
             return Result<AdSetDto>.Fail("Tenant no resuelto");
 
-        var campaign = await _campaignRepository.GetByIdAsync(tenantId.Value, request.CampaignId, cancellationToken);
+        var adSet = await _adSetRepository.GetByIdAsync(tenantId, adSetId, cancellationToken);
+        return adSet is null
+            ? Result<AdSetDto>.Fail("AdSet no encontrado")
+            : Result<AdSetDto>.Ok(Map(adSet));
+    }
+
+    public async Task<Result<AdSetDto>> CreateAsync(CreateAdSetRequest request, CancellationToken cancellationToken = default)
+    {
+        if (!TryGetTenantId(out var tenantId))
+            return Result<AdSetDto>.Fail("Tenant no resuelto");
+
+        var campaign = await _campaignRepository.GetByIdAsync(tenantId, request.CampaignId, cancellationToken);
         if (campaign is null)
             return Result<AdSetDto>.Fail("Campaña no encontrada");
 
@@ -44,13 +63,13 @@ public sealed class AdSetService : IAdSetService
         if (adAccount is null)
             return Result<AdSetDto>.Fail("Ad account no encontrada");
 
-        var metaAdSetId = await _metaAdsService.CreateAdSetAsync(tenantId.Value, adAccount.MetaAccountId,
+        var metaAdSetId = await _metaAdsService.CreateAdSetAsync(tenantId, adAccount.MetaAccountId,
             new MetaAdSetCreateRequest(request.Name, campaign.MetaCampaignId, request.Status, request.DailyBudget, request.BillingEvent, request.OptimizationGoal, request.TargetingJson),
             cancellationToken);
 
         var adSet = new AdSet
         {
-            TenantId = tenantId.Value,
+            TenantId = tenantId,
             CampaignId = campaign.Id,
             MetaAdSetId = metaAdSetId,
             Name = request.Name,
@@ -63,20 +82,86 @@ public sealed class AdSetService : IAdSetService
         };
 
         await _adSetRepository.AddAsync(adSet, cancellationToken);
-        _dbContext.AuditLogs.Add(new AuditLog
-        {
-            TenantId = tenantId.Value,
-            UserId = _tenantProvider.GetUserId() ?? Guid.Empty,
-            Action = "create adset",
-            EntityName = nameof(AdSet),
-            EntityId = adSet.Id.ToString(),
-            PayloadJson = JsonSerializer.Serialize(adSet)
-        });
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        await WriteAuditLogAsync(tenantId, _tenantProvider.GetUserId(), "create adset", nameof(AdSet), adSet.Id.ToString(), adSet, cancellationToken);
 
         return Result<AdSetDto>.Ok(Map(adSet), "AdSet creado correctamente");
     }
 
+    public async Task<Result<AdSetDto>> UpdateAdSetAsync(Guid adSetId, UpdateAdSetRequest request, CancellationToken cancellationToken = default)
+    {
+        if (!TryGetTenantId(out var tenantId))
+            return Result<AdSetDto>.Fail("Tenant no resuelto");
+
+        var adSet = await _adSetRepository.GetByIdAsync(tenantId, adSetId, cancellationToken);
+        if (adSet is null)
+            return Result<AdSetDto>.Fail("AdSet no encontrado");
+
+        await _metaAdsService.UpdateAdSetAsync(
+            tenantId,
+            new MetaAdSetUpdateRequest(adSet.MetaAdSetId, request.Name, request.Status, request.Budget, request.BillingEvent, request.OptimizationGoal, request.TargetingJson),
+            cancellationToken);
+
+        adSet.Name = request.Name;
+        adSet.Status = request.Status;
+        adSet.Budget = request.Budget;
+        adSet.BillingEvent = request.BillingEvent;
+        adSet.OptimizationGoal = request.OptimizationGoal;
+        adSet.TargetingJson = request.TargetingJson;
+        adSet.BidStrategy = request.BidStrategy;
+        adSet.StartDate = request.StartDate;
+        adSet.EndDate = request.EndDate;
+
+        await _adSetRepository.UpdateAsync(adSet, cancellationToken);
+        await WriteAuditLogAsync(tenantId, _tenantProvider.GetUserId(), "update adset", nameof(AdSet), adSet.Id.ToString(), request, cancellationToken);
+
+        return Result<AdSetDto>.Ok(Map(adSet), "AdSet actualizado correctamente");
+    }
+
+    public Task<Result<AdSetDto>> PauseAdSetAsync(Guid adSetId, CancellationToken cancellationToken = default)
+        => ChangeStatusAsync(adSetId, "PAUSED", cancellationToken);
+
+    public Task<Result<AdSetDto>> ActivateAdSetAsync(Guid adSetId, CancellationToken cancellationToken = default)
+        => ChangeStatusAsync(adSetId, "ACTIVE", cancellationToken);
+
+    private async Task<Result<AdSetDto>> ChangeStatusAsync(Guid adSetId, string status, CancellationToken cancellationToken)
+    {
+        if (!TryGetTenantId(out var tenantId))
+            return Result<AdSetDto>.Fail("Tenant no resuelto");
+
+        var adSet = await _adSetRepository.GetByIdAsync(tenantId, adSetId, cancellationToken);
+        if (adSet is null)
+            return Result<AdSetDto>.Fail("AdSet no encontrado");
+
+        await _metaAdsService.UpdateAdSetStatusAsync(tenantId, new MetaAdSetStatusUpdateRequest(adSet.MetaAdSetId, status), cancellationToken);
+
+        adSet.Status = status;
+        await _adSetRepository.UpdateAsync(adSet, cancellationToken);
+        await WriteAuditLogAsync(tenantId, _tenantProvider.GetUserId(), status == "PAUSED" ? "pause adset" : "activate adset", nameof(AdSet), adSet.Id.ToString(), new { adSet.Status }, cancellationToken);
+
+        return Result<AdSetDto>.Ok(Map(adSet), $"Estado actualizado a {status}");
+    }
+
+    private bool TryGetTenantId(out Guid tenantId)
+    {
+        tenantId = _tenantProvider.GetTenantId() ?? Guid.Empty;
+        return tenantId != Guid.Empty;
+    }
+
     private static AdSetDto Map(AdSet adSet) =>
         new(adSet.Id, adSet.MetaAdSetId, adSet.CampaignId, adSet.Name, adSet.Status, adSet.Budget, adSet.BillingEvent, adSet.OptimizationGoal, adSet.BidStrategy, adSet.TargetingJson, adSet.StartDate, adSet.EndDate);
+
+    private async Task WriteAuditLogAsync(Guid tenantId, Guid? userId, string action, string entityName, string entityId, object payload, CancellationToken cancellationToken)
+    {
+        _dbContext.AuditLogs.Add(new AuditLog
+        {
+            TenantId = tenantId,
+            UserId = userId ?? Guid.Empty,
+            Action = action,
+            EntityName = entityName,
+            EntityId = entityId,
+            PayloadJson = JsonSerializer.Serialize(payload)
+        });
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
 }
