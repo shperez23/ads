@@ -16,12 +16,14 @@ using Hangfire.PostgreSql;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using StackExchange.Redis;
 
 namespace AdsManager.Infrastructure.DependencyInjection;
 
 public static class InfrastructureServiceCollectionExtensions
 {
-    public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
     {
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
         services.Configure<CacheOptions>(configuration.GetSection(CacheOptions.SectionName));
@@ -43,9 +45,9 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
         services.AddScoped<ISecretEncryptionService, SecretEncryptionService>();
         services.AddScoped<IAuthProtectionService, AuthProtectionService>();
-        services.AddMemoryCache();
-        // Initial implementation is in-memory; abstraction left ready for Redis-backed implementation.
-        services.AddSingleton<ICacheService, MemoryCacheService>();
+
+        RegisterCacheServices(services, configuration, environment);
+
         services.AddSingleton<IObservabilityMetrics, ObservabilityMetrics>();
 
         services.AddHttpClient<IMetaAdsService, MetaAdsService>();
@@ -78,5 +80,39 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddHangfireServer();
 
         return services;
+    }
+
+    private static void RegisterCacheServices(IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
+    {
+        var cacheOptions = configuration.GetSection(CacheOptions.SectionName).Get<CacheOptions>() ?? new CacheOptions();
+        var provider = cacheOptions.Provider?.Trim();
+        var useRedis = string.Equals(provider, "Redis", StringComparison.OrdinalIgnoreCase);
+        var redisConnectionString = Environment.GetEnvironmentVariable("ADSMANAGER_REDIS_CONNECTION")
+            ?? cacheOptions.Redis.ConnectionString;
+
+        services.AddMemoryCache();
+
+        if (!useRedis)
+        {
+            services.AddSingleton<ICacheService, MemoryCacheService>();
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(redisConnectionString))
+        {
+            services.AddSingleton<ICacheService, MemoryCacheService>();
+            return;
+        }
+
+        try
+        {
+            var multiplexer = ConnectionMultiplexer.Connect(redisConnectionString);
+            services.AddSingleton<IConnectionMultiplexer>(multiplexer);
+            services.AddSingleton<ICacheService, RedisCacheService>();
+        }
+        catch when (environment.IsDevelopment())
+        {
+            services.AddSingleton<ICacheService, MemoryCacheService>();
+        }
     }
 }

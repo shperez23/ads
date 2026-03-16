@@ -35,7 +35,8 @@ public sealed class ReportService : IReportService
         var tenantId = _tenantProvider.GetTenantId()!.Value;
         var page = request.NormalizedPage;
         var pageSize = request.NormalizedPageSize;
-        var cacheKey = $"{InsightsCacheKeys.Report(tenantId, request.DateFrom, request.DateTo, request.CampaignId, request.AdAccountId)}:p:{page}:ps:{pageSize}:s:{request.Search}:sb:{request.SortBy}:sd:{request.SortDirection}";
+        var reportBaseKey = InsightsCacheKeys.Report(tenantId, request.DateFrom, request.DateTo, request.CampaignId, request.AdAccountId);
+        var cacheKey = InsightsCacheKeys.ReportPage(reportBaseKey, page, pageSize, request.Search, request.SortBy, request.SortDirection);
         var ttl = TimeSpan.FromSeconds(Math.Max(1, _cacheOptions.ReportTtlSeconds));
 
         var response = await _cacheService.GetOrCreateAsync(
