@@ -15,16 +15,16 @@ public sealed class AdsService : IAdsService
     private readonly IAdSetRepository _adSetRepository;
     private readonly IAdRepository _adRepository;
     private readonly IMetaAdsService _metaAdsService;
-    private readonly IApplicationDbContext _dbContext;
     private readonly ITenantProvider _tenantProvider;
+    private readonly IAuditService _auditService;
 
-    public AdsService(IAdSetRepository adSetRepository, IAdRepository adRepository, IMetaAdsService metaAdsService, IApplicationDbContext dbContext, ITenantProvider tenantProvider)
+    public AdsService(IAdSetRepository adSetRepository, IAdRepository adRepository, IMetaAdsService metaAdsService, ITenantProvider tenantProvider, IAuditService auditService)
     {
         _adSetRepository = adSetRepository;
         _adRepository = adRepository;
         _metaAdsService = metaAdsService;
-        _dbContext = dbContext;
         _tenantProvider = tenantProvider;
+        _auditService = auditService;
     }
 
     public async Task<Result<IReadOnlyCollection<AdDto>>> GetAdsAsync(CancellationToken cancellationToken = default)
@@ -70,7 +70,7 @@ public sealed class AdsService : IAdsService
         };
 
         await _adRepository.AddAsync(ad, cancellationToken);
-        await WriteAuditLogAsync(tenantId, _tenantProvider.GetUserId(), "create ad", nameof(Ad), ad.Id.ToString(), ad, cancellationToken);
+        await _auditService.LogAsync(_tenantProvider.GetUserId(), tenantId, "create ad", nameof(Ad), ad.Id.ToString(), JsonSerializer.Serialize(ad), cancellationToken);
 
         return Result<AdDto>.Ok(Map(ad), "Ad creado correctamente");
     }
@@ -92,7 +92,7 @@ public sealed class AdsService : IAdsService
         ad.PreviewUrl = request.PreviewUrl;
 
         await _adRepository.UpdateAsync(ad, cancellationToken);
-        await WriteAuditLogAsync(tenantId, _tenantProvider.GetUserId(), "update ad", nameof(Ad), ad.Id.ToString(), request, cancellationToken);
+        await _auditService.LogAsync(_tenantProvider.GetUserId(), tenantId, "update ad", nameof(Ad), ad.Id.ToString(), JsonSerializer.Serialize(request), cancellationToken);
 
         return Result<AdDto>.Ok(Map(ad), "Ad actualizado correctamente");
     }
@@ -116,7 +116,7 @@ public sealed class AdsService : IAdsService
 
         ad.Status = status;
         await _adRepository.UpdateAsync(ad, cancellationToken);
-        await WriteAuditLogAsync(tenantId, _tenantProvider.GetUserId(), status == "PAUSED" ? "pause ad" : "activate ad", nameof(Ad), ad.Id.ToString(), new { ad.Status }, cancellationToken);
+        await _auditService.LogAsync(_tenantProvider.GetUserId(), tenantId, status == "PAUSED" ? "pause ad" : "activate ad", nameof(Ad), ad.Id.ToString(), JsonSerializer.Serialize(new { ad.Status }), cancellationToken);
 
         return Result<AdDto>.Ok(Map(ad), $"Estado actualizado a {status}");
     }
@@ -130,19 +130,4 @@ public sealed class AdsService : IAdsService
     private static AdDto Map(Ad ad)
         => new(ad.Id, ad.MetaAdId, ad.AdSetId, ad.Name, ad.Status, ad.CreativeJson, ad.PreviewUrl);
 
-    private async Task WriteAuditLogAsync(Guid tenantId, Guid? userId, string action, string entityName, string entityId, object payload, CancellationToken cancellationToken)
-    {
-        _dbContext.AuditLogs.Add(new AuditLog
-        {
-            TenantId = tenantId,
-            UserId = userId ?? Guid.Empty,
-            Action = action,
-            EntityName = entityName,
-            EntityId = entityId,
-            PayloadJson = JsonSerializer.Serialize(payload),
-            TraceId = _tenantProvider.GetTraceId()
-        });
-
-        await _dbContext.SaveChangesAsync(cancellationToken);
-    }
 }

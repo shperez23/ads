@@ -6,6 +6,7 @@ using AdsManager.Application.Interfaces.Repositories;
 using AdsManager.Application.Interfaces.Services;
 using AdsManager.Domain.Entities;
 using AdsManager.Domain.Enums;
+using System.Text.Json;
 
 namespace AdsManager.Application.Services;
 
@@ -17,17 +18,20 @@ public sealed class MetaConnectionService : IMetaConnectionService
     private readonly ITenantProvider _tenantProvider;
     private readonly ISecretEncryptionService _secretEncryptionService;
     private readonly IMetaConnectionApiClient _metaConnectionApiClient;
+    private readonly IAuditService _auditService;
 
     public MetaConnectionService(
         IMetaConnectionRepository metaConnectionRepository,
         ITenantProvider tenantProvider,
         ISecretEncryptionService secretEncryptionService,
-        IMetaConnectionApiClient metaConnectionApiClient)
+        IMetaConnectionApiClient metaConnectionApiClient,
+        IAuditService auditService)
     {
         _metaConnectionRepository = metaConnectionRepository;
         _tenantProvider = tenantProvider;
         _secretEncryptionService = secretEncryptionService;
         _metaConnectionApiClient = metaConnectionApiClient;
+        _auditService = auditService;
     }
 
     public async Task<Result<IReadOnlyCollection<MetaConnectionDto>>> GetConnectionsAsync(CancellationToken cancellationToken = default)
@@ -57,6 +61,7 @@ public sealed class MetaConnectionService : IMetaConnectionService
         };
 
         await _metaConnectionRepository.AddAsync(connection, cancellationToken);
+        await _auditService.LogAsync(_tenantProvider.GetUserId(), tenantId, "create connection", nameof(MetaConnection), connection.Id.ToString(), JsonSerializer.Serialize(request), cancellationToken);
         return Result<MetaConnectionDto>.Ok(Map(connection), "Conexión creada correctamente");
     }
 
@@ -77,6 +82,7 @@ public sealed class MetaConnectionService : IMetaConnectionService
         connection.BusinessId = request.BusinessId;
 
         await _metaConnectionRepository.UpdateAsync(connection, cancellationToken);
+        await _auditService.LogAsync(_tenantProvider.GetUserId(), tenantId, "update connection", nameof(MetaConnection), connection.Id.ToString(), JsonSerializer.Serialize(request), cancellationToken);
         return Result<MetaConnectionDto>.Ok(Map(connection), "Conexión actualizada correctamente");
     }
 
@@ -90,6 +96,7 @@ public sealed class MetaConnectionService : IMetaConnectionService
             return Result<bool>.Fail("Conexión no encontrada");
 
         await _metaConnectionRepository.DeleteAsync(connection, cancellationToken);
+        await _auditService.LogAsync(_tenantProvider.GetUserId(), tenantId, "delete connection", nameof(MetaConnection), connection.Id.ToString(), JsonSerializer.Serialize(new { connection.AppId, connection.BusinessId }), cancellationToken);
         return Result<bool>.Ok(true, "Conexión eliminada correctamente");
     }
 
@@ -116,6 +123,15 @@ public sealed class MetaConnectionService : IMetaConnectionService
             : ConnectionStatus.Invalid;
 
         await _metaConnectionRepository.UpdateAsync(connection, cancellationToken);
+
+        await _auditService.LogAsync(
+            _tenantProvider.GetUserId(),
+            tenantId,
+            "validate connection",
+            nameof(MetaConnection),
+            connection.Id.ToString(),
+            JsonSerializer.Serialize(new { isTokenValid, hasRequiredPermissions, missingPermissions, connection.Status }),
+            cancellationToken);
 
         var result = new MetaConnectionValidationResultDto(connection.Id, isTokenValid, hasRequiredPermissions, connection.Status, missingPermissions);
         return Result<MetaConnectionValidationResultDto>.Ok(result, "Conexión validada correctamente");

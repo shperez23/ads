@@ -39,6 +39,7 @@ builder.Services.AddScoped<IAdsService, AdsService>();
 builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<IMetaConnectionService, MetaConnectionService>();
+builder.Services.AddScoped<IAuditService, AuditService>();
 builder.Services.AddAutoMapper(cfg => cfg.AddProfile<AuthMappingProfile>());
 builder.Services.AddValidatorsFromAssemblyContaining<RegisterRequestValidator>();
 builder.Services.AddFluentValidationAutoValidation();
