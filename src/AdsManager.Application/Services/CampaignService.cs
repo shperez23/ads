@@ -18,14 +18,16 @@ public sealed class CampaignService : ICampaignService
     private readonly IMetaAdsService _metaAdsService;
     private readonly ITenantProvider _tenantProvider;
     private readonly IObservabilityMetrics _observabilityMetrics;
+    private readonly IAuditService _auditService;
 
-    public CampaignService(ICampaignRepository campaignRepository, IApplicationDbContext dbContext, IMetaAdsService metaAdsService, ITenantProvider tenantProvider, IObservabilityMetrics observabilityMetrics)
+    public CampaignService(ICampaignRepository campaignRepository, IApplicationDbContext dbContext, IMetaAdsService metaAdsService, ITenantProvider tenantProvider, IObservabilityMetrics observabilityMetrics, IAuditService auditService)
     {
         _campaignRepository = campaignRepository;
         _dbContext = dbContext;
         _metaAdsService = metaAdsService;
         _tenantProvider = tenantProvider;
         _observabilityMetrics = observabilityMetrics;
+        _auditService = auditService;
     }
 
     public async Task<Result<IReadOnlyCollection<CampaignDto>>> GetAllAsync(CancellationToken cancellationToken = default)
@@ -77,7 +79,7 @@ public sealed class CampaignService : ICampaignService
         };
 
         await _campaignRepository.AddAsync(campaign, cancellationToken);
-        await WriteAuditLogAsync(tenantId, _tenantProvider.GetUserId(), "create campaign", nameof(Campaign), campaign.Id.ToString(), campaign, cancellationToken);
+        await _auditService.LogAsync(_tenantProvider.GetUserId(), tenantId, "create campaign", nameof(Campaign), campaign.Id.ToString(), JsonSerializer.Serialize(campaign), cancellationToken);
         _observabilityMetrics.IncrementCampaignCreation();
         return Result<CampaignDto>.Ok(Map(campaign), "Campaña creada correctamente");
     }
@@ -100,7 +102,7 @@ public sealed class CampaignService : ICampaignService
         campaign.EndDate = request.EndDate;
 
         await _campaignRepository.UpdateAsync(campaign, cancellationToken);
-        await WriteAuditLogAsync(tenantId, _tenantProvider.GetUserId(), "update campaign", nameof(Campaign), campaign.Id.ToString(), request, cancellationToken);
+        await _auditService.LogAsync(_tenantProvider.GetUserId(), tenantId, "update campaign", nameof(Campaign), campaign.Id.ToString(), JsonSerializer.Serialize(request), cancellationToken);
         return Result<CampaignDto>.Ok(Map(campaign), "Campaña actualizada correctamente");
     }
 
@@ -123,7 +125,7 @@ public sealed class CampaignService : ICampaignService
 
         campaign.Status = status;
         await _campaignRepository.UpdateAsync(campaign, cancellationToken);
-        await WriteAuditLogAsync(tenantId, _tenantProvider.GetUserId(), status == "PAUSED" ? "pause campaign" : "update campaign", nameof(Campaign), campaign.Id.ToString(), new { campaign.Status }, cancellationToken);
+        await _auditService.LogAsync(_tenantProvider.GetUserId(), tenantId, status == "PAUSED" ? "pause campaign" : "activate campaign", nameof(Campaign), campaign.Id.ToString(), JsonSerializer.Serialize(new { campaign.Status }), cancellationToken);
 
         return Result<CampaignDto>.Ok(Map(campaign), $"Estado actualizado a {status}");
     }
@@ -147,19 +149,4 @@ public sealed class CampaignService : ICampaignService
             campaign.StartDate,
             campaign.EndDate);
 
-    private async Task WriteAuditLogAsync(Guid tenantId, Guid? userId, string action, string entityName, string entityId, object payload, CancellationToken cancellationToken)
-    {
-        _dbContext.AuditLogs.Add(new AuditLog
-        {
-            TenantId = tenantId,
-            UserId = userId ?? Guid.Empty,
-            Action = action,
-            EntityName = entityName,
-            EntityId = entityId,
-            PayloadJson = JsonSerializer.Serialize(payload),
-            TraceId = _tenantProvider.GetTraceId()
-        });
-
-        await _dbContext.SaveChangesAsync(cancellationToken);
-    }
 }

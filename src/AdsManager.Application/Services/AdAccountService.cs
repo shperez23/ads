@@ -15,13 +15,15 @@ public sealed class AdAccountService : IAdAccountService
     private readonly IApplicationDbContext _dbContext;
     private readonly IMetaAdsService _metaAdsService;
     private readonly ITenantProvider _tenantProvider;
+    private readonly IAuditService _auditService;
 
-    public AdAccountService(IAdAccountRepository adAccountRepository, IApplicationDbContext dbContext, IMetaAdsService metaAdsService, ITenantProvider tenantProvider)
+    public AdAccountService(IAdAccountRepository adAccountRepository, IApplicationDbContext dbContext, IMetaAdsService metaAdsService, ITenantProvider tenantProvider, IAuditService auditService)
     {
         _adAccountRepository = adAccountRepository;
         _dbContext = dbContext;
         _metaAdsService = metaAdsService;
         _tenantProvider = tenantProvider;
+        _auditService = auditService;
     }
 
     public async Task<Result<IReadOnlyCollection<AdAccountDto>>> GetAllAsync(CancellationToken cancellationToken = default)
@@ -66,17 +68,7 @@ public sealed class AdAccountService : IAdAccountService
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        _dbContext.AuditLogs.Add(new AuditLog
-        {
-            TenantId = tenantId,
-            UserId = _tenantProvider.GetUserId() ?? Guid.Empty,
-            Action = "import adaccounts",
-            EntityName = nameof(AdAccount),
-            EntityId = string.Empty,
-            PayloadJson = JsonSerializer.Serialize(metaAccounts),
-            TraceId = _tenantProvider.GetTraceId()
-        });
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        await _auditService.LogAsync(_tenantProvider.GetUserId(), tenantId, "sync adaccounts", nameof(AdAccount), string.Empty, JsonSerializer.Serialize(metaAccounts), cancellationToken);
 
         var updatedAccounts = await _adAccountRepository.GetByTenantAsync(tenantId, cancellationToken);
         return Result<IReadOnlyCollection<AdAccountDto>>.Ok(updatedAccounts.Select(Map).ToArray(), "AdAccounts importadas correctamente");
@@ -94,6 +86,8 @@ public sealed class AdAccountService : IAdAccountService
         await _metaAdsService.SyncCampaignsAsync(tenantId, adAccount.MetaAccountId, cancellationToken);
         await _metaAdsService.SyncAdSetsAsync(tenantId, adAccount.MetaAccountId, cancellationToken);
         await _metaAdsService.SyncAdsAsync(tenantId, adAccount.MetaAccountId, cancellationToken);
+
+        await _auditService.LogAsync(_tenantProvider.GetUserId(), tenantId, "sync adaccount", nameof(AdAccount), adAccount.Id.ToString(), JsonSerializer.Serialize(new { adAccount.MetaAccountId }), cancellationToken);
 
         return Result<string>.Ok(adAccount.Id.ToString(), "Sincronización de AdAccount completada");
     }
