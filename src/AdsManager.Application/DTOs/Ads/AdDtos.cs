@@ -15,3 +15,9 @@ public sealed record CreateAdRequest(
     string Status,
     string CreativeJson,
     string? PreviewUrl);
+
+public sealed record UpdateAdRequest(
+    string Name,
+    string Status,
+    string CreativeJson,
+    string? PreviewUrl);

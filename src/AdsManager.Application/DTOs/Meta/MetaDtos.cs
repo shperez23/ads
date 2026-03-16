@@ -10,4 +10,6 @@ public sealed record MetaAdSetCreateRequest(string Name, string CampaignId, stri
 public sealed record MetaAdSetUpdateRequest(string AdSetId, string Name, string Status, decimal DailyBudget, string BillingEvent, string OptimizationGoal, string TargetingJson);
 public sealed record MetaAdSetStatusUpdateRequest(string AdSetId, string Status);
 public sealed record MetaAdCreateRequest(string Name, string AdSetId, string Status, string CreativeJson);
+public sealed record MetaAdUpdateRequest(string AdId, string Name, string Status, string CreativeJson);
+public sealed record MetaAdStatusUpdateRequest(string AdId, string Status);
 public sealed record MetaInsightDto(string DateStart, string DateStop, string CampaignId, string CampaignName, string Spend, string Impressions, string Clicks, string Ctr);

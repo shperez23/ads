@@ -118,6 +118,21 @@ public sealed class MetaAdsService : IMetaAdsService
             },
             cancellationToken);
 
+    public Task UpdateAdAsync(Guid tenantId, MetaAdUpdateRequest request, CancellationToken cancellationToken = default)
+        => PostAsync(
+            tenantId,
+            request.AdId,
+            new Dictionary<string, string>
+            {
+                ["name"] = request.Name,
+                ["status"] = request.Status,
+                ["creative"] = request.CreativeJson
+            },
+            cancellationToken);
+
+    public Task UpdateAdStatusAsync(Guid tenantId, MetaAdStatusUpdateRequest request, CancellationToken cancellationToken = default)
+        => PostAsync(tenantId, request.AdId, new Dictionary<string, string> { ["status"] = request.Status }, cancellationToken);
+
     public Task<IReadOnlyCollection<MetaInsightDto>> GetInsightsAsync(Guid tenantId, string adAccountId, DateOnly since, DateOnly until, CancellationToken cancellationToken = default)
         => GetDataAsync(tenantId,
             $"act_{adAccountId}/insights?fields=date_start,date_stop,campaign_id,campaign_name,spend,impressions,clicks,ctr&level=campaign&time_range={{\"since\":\"{since:yyyy-MM-dd}\",\"until\":\"{until:yyyy-MM-dd}\"}}",
