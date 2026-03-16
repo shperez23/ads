@@ -45,6 +45,16 @@ builder.Services.AddFluentValidationAutoValidation();
 var jwt = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
 jwt.SecretKey = Environment.GetEnvironmentVariable("ADSMANAGER_JWT_SECRET") ?? jwt.SecretKey;
 
+if (string.IsNullOrWhiteSpace(jwt.SecretKey))
+{
+    throw new InvalidOperationException("JWT secret key is not configured. Set ADSMANAGER_JWT_SECRET or Jwt:SecretKey in configuration.");
+}
+
+if (Encoding.UTF8.GetByteCount(jwt.SecretKey) < 32)
+{
+    throw new InvalidOperationException("JWT secret key must be at least 32 bytes for HMAC SHA-256.");
+}
+
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
