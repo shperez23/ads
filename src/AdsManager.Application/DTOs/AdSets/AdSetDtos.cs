@@ -1,0 +1,26 @@
+namespace AdsManager.Application.DTOs.AdSets;
+
+public sealed record AdSetDto(
+    Guid Id,
+    string MetaAdSetId,
+    Guid CampaignId,
+    string Name,
+    string Status,
+    decimal Budget,
+    string BillingEvent,
+    string OptimizationGoal,
+    string BidStrategy,
+    string TargetingJson,
+    DateTime? StartDate,
+    DateTime? EndDate);
+
+public sealed record CreateAdSetRequest(
+    Guid CampaignId,
+    string Name,
+    string Status,
+    long DailyBudget,
+    string BillingEvent,
+    string OptimizationGoal,
+    string TargetingJson,
+    string AccessToken,
+    string BidStrategy = "LOWEST_COST_WITHOUT_CAP");

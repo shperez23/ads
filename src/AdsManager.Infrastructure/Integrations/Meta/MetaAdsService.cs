@@ -4,6 +4,7 @@ using AdsManager.Application.DTOs.Meta;
 using AdsManager.Application.Interfaces;
 using AdsManager.Application.Interfaces.Meta;
 using AdsManager.Domain.Entities;
+using Microsoft.EntityFrameworkCore;
 
 namespace AdsManager.Infrastructure.Integrations.Meta;
 
@@ -58,6 +59,7 @@ public sealed class MetaAdsService : IMetaAdsService
         if (request.LifetimeBudget.HasValue) body["lifetime_budget"] = request.LifetimeBudget.Value.ToString();
 
         var campaignId = await PostForIdAsync($"act_{adAccountId}/campaigns", body, cancellationToken);
+        await PersistCampaignAsync(adAccountId, campaignId, request, cancellationToken);
         return campaignId;
     }
 
@@ -81,7 +83,9 @@ public sealed class MetaAdsService : IMetaAdsService
             ["access_token"] = accessToken
         };
 
-        return await PostForIdAsync($"act_{adAccountId}/adsets", body, cancellationToken);
+        var adSetId = await PostForIdAsync($"act_{adAccountId}/adsets", body, cancellationToken);
+        await PersistAdSetAsync(request.CampaignId, adSetId, request, cancellationToken);
+        return adSetId;
     }
 
     public async Task<string> CreateAdAsync(MetaAdCreateRequest request, string accessToken, CancellationToken cancellationToken = default)
@@ -140,6 +144,69 @@ public sealed class MetaAdsService : IMetaAdsService
         response.EnsureSuccessStatusCode();
 
         return json;
+    }
+
+
+    private async Task PersistCampaignAsync(string adAccountId, string campaignId, MetaCampaignCreateRequest request, CancellationToken cancellationToken)
+    {
+        var adAccountMatches = await _dbContext.AdAccounts
+            .Where(x => x.MetaAccountId == adAccountId)
+            .ToListAsync(cancellationToken);
+
+        if (adAccountMatches.Count != 1)
+            return;
+
+        var adAccount = adAccountMatches[0];
+
+        var exists = await _dbContext.Campaigns.AnyAsync(x => x.TenantId == adAccount.TenantId && x.MetaCampaignId == campaignId, cancellationToken);
+        if (exists)
+            return;
+
+        _dbContext.Campaigns.Add(new Campaign
+        {
+            TenantId = adAccount.TenantId,
+            AdAccountId = adAccount.Id,
+            MetaCampaignId = campaignId,
+            Name = request.Name,
+            Objective = request.Objective,
+            Status = request.Status,
+            DailyBudget = request.DailyBudget,
+            LifetimeBudget = request.LifetimeBudget
+        });
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task PersistAdSetAsync(string metaCampaignId, string adSetId, MetaAdSetCreateRequest request, CancellationToken cancellationToken)
+    {
+        var campaignMatches = await _dbContext.Campaigns
+            .Where(x => x.MetaCampaignId == metaCampaignId)
+            .ToListAsync(cancellationToken);
+
+        if (campaignMatches.Count != 1)
+            return;
+
+        var campaign = campaignMatches[0];
+
+        var exists = await _dbContext.AdSets.AnyAsync(x => x.TenantId == campaign.TenantId && x.MetaAdSetId == adSetId, cancellationToken);
+        if (exists)
+            return;
+
+        _dbContext.AdSets.Add(new AdSet
+        {
+            TenantId = campaign.TenantId,
+            CampaignId = campaign.Id,
+            MetaAdSetId = adSetId,
+            Name = request.Name,
+            Status = request.Status,
+            Budget = request.DailyBudget,
+            BillingEvent = request.BillingEvent,
+            OptimizationGoal = request.OptimizationGoal,
+            BidStrategy = string.Empty,
+            TargetingJson = request.TargetingJson
+        });
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
     private async Task LogApiAsync(string endpoint, string method, string requestJson, string responseJson, int statusCode, CancellationToken cancellationToken)
