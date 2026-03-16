@@ -32,6 +32,7 @@ public static class InfrastructureServiceCollectionExtensions
             sp.GetRequiredService<AdsManagerDbContext>());
 
         services.AddScoped<IPasswordHasher, PasswordHasher>();
+        services.AddScoped<IRefreshTokenService, RefreshTokenService>();
         services.AddDataProtection();
         services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
         services.AddScoped<ISecretEncryptionService, SecretEncryptionService>();
