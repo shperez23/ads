@@ -1,0 +1,45 @@
+# Archivos de compilacion
+bin/
+obj/
+out/
+
+# Configuracion de Visual Studio
+.vs/
+*.user
+*.suo
+
+# Configuracion de Rider / JetBrains
+.idea/
+*.iml
+
+# Archivos temporales
+*.log
+*.tmp
+*.cache
+
+# Paquetes NuGet descargados (se restauran con `dotnet restore`)
+*.nupkg
+*.snupkg
+packages/
+
+# Archivos de publicacion
+publish/
+app.publish/
+
+# Secretos / configuracion local
+appsettings.Development.json
+appsettings.Local.json
+*.env
+
+# Archivos de cobertura / test
+*.coverage
+*.coveragexml
+TestResults/
+coverage/
+
+# Configuracion de VS Code
+.vscode/
+
+# Sistema operativo
+[Dd]esktop.ini
+[Tt]humbs.db
