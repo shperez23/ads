@@ -25,20 +25,26 @@ public sealed class AuthService : IAuthService
 
     public async Task<Result<AuthResponse>> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken = default)
     {
-        if (await _dbContext.Users.AnyAsync(u => u.Email == request.Email, cancellationToken))
+        var normalizedEmail = request.Email.Trim().ToLowerInvariant();
+
+        if (await _dbContext.Users.AnyAsync(u => u.Email == normalizedEmail, cancellationToken))
             return Result<AuthResponse>.Fail("El correo ya está registrado");
 
         if (await _dbContext.Tenants.AnyAsync(t => t.Slug == request.TenantSlug, cancellationToken))
             return Result<AuthResponse>.Fail("El slug de tenant ya existe");
 
+        var adminRole = await _dbContext.Roles.FirstOrDefaultAsync(x => x.Name == "Admin", cancellationToken);
+        if (adminRole is null)
+            return Result<AuthResponse>.Fail("No se encontró el rol Admin. Ejecuta migraciones y seed.");
+
         var tenant = new Tenant { Name = request.TenantName, Slug = request.TenantSlug, Status = TenantStatus.Active };
         var user = new User
         {
             Tenant = tenant,
+            RoleId = adminRole.Id,
             Name = request.Name,
-            Email = request.Email.Trim().ToLowerInvariant(),
+            Email = normalizedEmail,
             PasswordHash = _passwordHasher.Hash(request.Password),
-            Role = UserRole.Admin,
             Status = UserStatus.Active
         };
 
@@ -55,12 +61,16 @@ public sealed class AuthService : IAuthService
         _dbContext.RefreshTokens.Add(refreshToken);
         await _dbContext.SaveChangesAsync(cancellationToken);
 
+        user.Role = adminRole;
         return Result<AuthResponse>.Ok(BuildAuthResponse(user, refreshToken.Token), "Usuario registrado correctamente");
     }
 
     public async Task<Result<AuthResponse>> LoginAsync(LoginRequest request, CancellationToken cancellationToken = default)
     {
-        var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.Email == request.Email.Trim().ToLowerInvariant(), cancellationToken);
+        var user = await _dbContext.Users
+            .Include(x => x.Role)
+            .FirstOrDefaultAsync(u => u.Email == request.Email.Trim().ToLowerInvariant(), cancellationToken);
+
         if (user is null || !_passwordHasher.Verify(request.Password, user.PasswordHash))
             return Result<AuthResponse>.Fail("Credenciales inválidas");
 
@@ -81,6 +91,7 @@ public sealed class AuthService : IAuthService
     {
         var existingRefreshToken = await _dbContext.RefreshTokens
             .Include(x => x.User)
+            .ThenInclude(x => x.Role)
             .FirstOrDefaultAsync(rt => rt.Token == request.RefreshToken && !rt.IsRevoked, cancellationToken);
 
         if (existingRefreshToken is null || existingRefreshToken.ExpiresAt <= DateTime.UtcNow)
@@ -103,7 +114,7 @@ public sealed class AuthService : IAuthService
 
     public async Task<Result<UserProfileDto>> GetCurrentUserAsync(Guid userId, CancellationToken cancellationToken = default)
     {
-        var user = await _dbContext.Users.AsNoTracking().FirstOrDefaultAsync(x => x.Id == userId, cancellationToken);
+        var user = await _dbContext.Users.AsNoTracking().Include(x => x.Role).FirstOrDefaultAsync(x => x.Id == userId, cancellationToken);
         if (user is null) return Result<UserProfileDto>.Fail("Usuario no encontrado");
 
         return Result<UserProfileDto>.Ok(_mapper.Map<UserProfileDto>(user));

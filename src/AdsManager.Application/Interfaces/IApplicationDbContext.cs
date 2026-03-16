@@ -6,6 +6,7 @@ namespace AdsManager.Application.Interfaces;
 public interface IApplicationDbContext
 {
     DbSet<Tenant> Tenants { get; }
+    DbSet<Role> Roles { get; }
     DbSet<User> Users { get; }
     DbSet<RefreshToken> RefreshTokens { get; }
     DbSet<MetaConnection> MetaConnections { get; }

@@ -1,6 +1,11 @@
 using AdsManager.Application.Interfaces;
+using AdsManager.Application.Interfaces.Meta;
+using AdsManager.Infrastructure.Background;
+using AdsManager.Infrastructure.Integrations.Meta;
 using AdsManager.Infrastructure.Persistence;
 using AdsManager.Infrastructure.Security;
+using Hangfire;
+using Hangfire.PostgreSql;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,12 +18,24 @@ public static class InfrastructureServiceCollectionExtensions
     {
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
 
-        services.AddDbContext<ApplicationDbContext>(options =>
-            options.UseNpgsql(configuration.GetConnectionString("DefaultConnection")));
+        var connectionString = configuration.GetConnectionString("DefaultConnection")
+            ?? throw new InvalidOperationException("DefaultConnection is not configured");
 
-        services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
+        services.AddDbContext<AdsManagerDbContext>(options => options.UseNpgsql(connectionString));
+
+        services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<AdsManagerDbContext>());
         services.AddScoped<IPasswordHasher, PasswordHasher>();
         services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
+
+        services.AddHttpClient<IMetaAdsService, MetaAdsService>();
+        services.AddScoped<InsightsSyncJob>();
+
+        services.AddHangfire(config => config
+            .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+            .UseSimpleAssemblyNameTypeSerializer()
+            .UseRecommendedSerializerSettings()
+            .UsePostgreSqlStorage(c => c.UseNpgsqlConnection(connectionString)));
+        services.AddHangfireServer();
 
         return services;
     }

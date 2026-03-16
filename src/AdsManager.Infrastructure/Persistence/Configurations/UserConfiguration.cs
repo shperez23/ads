@@ -15,6 +15,7 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(x => x.PasswordHash).HasMaxLength(512).IsRequired();
         builder.HasIndex(x => new { x.TenantId, x.Email }).IsUnique();
         builder.HasOne(x => x.Tenant).WithMany(t => t.Users).HasForeignKey(x => x.TenantId);
+        builder.HasOne(x => x.Role).WithMany(r => r.Users).HasForeignKey(x => x.RoleId);
         builder.HasQueryFilter(x => x.DeletedAt == null);
     }
 }

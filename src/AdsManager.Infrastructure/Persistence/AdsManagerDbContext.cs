@@ -5,13 +5,14 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AdsManager.Infrastructure.Persistence;
 
-public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
+public sealed class AdsManagerDbContext : DbContext, IApplicationDbContext
 {
-    public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options)
+    public AdsManagerDbContext(DbContextOptions<AdsManagerDbContext> options) : base(options)
     {
     }
 
     public DbSet<Tenant> Tenants => Set<Tenant>();
+    public DbSet<Role> Roles => Set<Role>();
     public DbSet<User> Users => Set<User>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<MetaConnection> MetaConnections => Set<MetaConnection>();
@@ -25,14 +26,14 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(AdsManagerDbContext).Assembly);
         base.OnModelCreating(modelBuilder);
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         var utcNow = DateTime.UtcNow;
-        foreach (var entry in ChangeTracker.Entries<AuditableEntity>())
+        foreach (var entry in ChangeTracker.Entries<BaseEntity>())
         {
             if (entry.State == EntityState.Added)
                 entry.Entity.CreatedAt = utcNow;
