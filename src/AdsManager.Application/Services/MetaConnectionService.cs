@@ -6,6 +6,7 @@ using AdsManager.Application.Interfaces.Repositories;
 using AdsManager.Application.Interfaces.Services;
 using AdsManager.Domain.Entities;
 using AdsManager.Domain.Enums;
+using System.Diagnostics;
 using System.Text.Json;
 
 namespace AdsManager.Application.Services;
@@ -19,19 +20,22 @@ public sealed class MetaConnectionService : IMetaConnectionService
     private readonly ISecretEncryptionService _secretEncryptionService;
     private readonly IMetaConnectionApiClient _metaConnectionApiClient;
     private readonly IAuditService _auditService;
+    private readonly IApplicationDbContext _dbContext;
 
     public MetaConnectionService(
         IMetaConnectionRepository metaConnectionRepository,
         ITenantProvider tenantProvider,
         ISecretEncryptionService secretEncryptionService,
         IMetaConnectionApiClient metaConnectionApiClient,
-        IAuditService auditService)
+        IAuditService auditService,
+        IApplicationDbContext dbContext)
     {
         _metaConnectionRepository = metaConnectionRepository;
         _tenantProvider = tenantProvider;
         _secretEncryptionService = secretEncryptionService;
         _metaConnectionApiClient = metaConnectionApiClient;
         _auditService = auditService;
+        _dbContext = dbContext;
     }
 
     public async Task<Result<IReadOnlyCollection<MetaConnectionDto>>> GetConnectionsAsync(CancellationToken cancellationToken = default)
@@ -135,6 +139,112 @@ public sealed class MetaConnectionService : IMetaConnectionService
 
         var result = new MetaConnectionValidationResultDto(connection.Id, isTokenValid, hasRequiredPermissions, connection.Status, missingPermissions);
         return Result<MetaConnectionValidationResultDto>.Ok(result, "Conexión validada correctamente");
+    }
+
+    public async Task<Result<MetaConnectionTokenRefreshResultDto>> RefreshTokenAsync(Guid connectionId, CancellationToken cancellationToken = default)
+    {
+        if (!TryGetTenantId(out var tenantId))
+            return Result<MetaConnectionTokenRefreshResultDto>.Fail("Tenant no resuelto");
+
+        var connection = await _metaConnectionRepository.GetByIdAsync(tenantId, connectionId, cancellationToken);
+        if (connection is null)
+            return Result<MetaConnectionTokenRefreshResultDto>.Fail("Conexión no encontrada");
+
+        if (!connection.IsTokenExpiringSoon(TimeSpan.FromDays(7)))
+        {
+            var notRequired = new MetaConnectionTokenRefreshResultDto(connection.Id, false, false, connection.TokenExpiration, connection.Status.ToString(), "El token aún no está próximo a expirar.");
+            return Result<MetaConnectionTokenRefreshResultDto>.Ok(notRequired, "Refresh no requerido");
+        }
+
+        if (string.IsNullOrWhiteSpace(connection.RefreshToken))
+        {
+            connection.LastHealthCheckAt = DateTime.UtcNow;
+            connection.LastHealthCheckStatus = "ReauthenticationRequired";
+            connection.LastHealthCheckDetails = "No existe refresh token en la conexión actual.";
+            await _metaConnectionRepository.UpdateAsync(connection, cancellationToken);
+
+            await _auditService.LogAsync(_tenantProvider.GetUserId(), tenantId, "refresh token", nameof(MetaConnection), connection.Id.ToString(), JsonSerializer.Serialize(new { status = "ReauthenticationRequired" }), cancellationToken);
+
+            var noRefreshTokenResult = new MetaConnectionTokenRefreshResultDto(connection.Id, false, true, connection.TokenExpiration, connection.Status.ToString(), "Reautenticación requerida: no hay refresh token configurado.");
+            return Result<MetaConnectionTokenRefreshResultDto>.Ok(noRefreshTokenResult, "Reautenticación requerida");
+        }
+
+        var appSecret = _secretEncryptionService.Decrypt(connection.AppSecret);
+        var accessToken = _secretEncryptionService.Decrypt(connection.AccessToken);
+
+        var stopwatch = Stopwatch.StartNew();
+        var apiResult = await _metaConnectionApiClient.TryRefreshTokenAsync(connection.AppId, appSecret, accessToken, cancellationToken);
+        stopwatch.Stop();
+
+        var payload = JsonSerializer.Serialize(new { connectionId, apiResult.IsSupported, apiResult.Success, apiResult.Message, apiResult.StatusCode });
+
+        await LogApiAsync("oauth/access_token", "GET", payload, apiResult.ResponsePayload, apiResult.StatusCode, apiResult.Success ? "Success" : "Failed", stopwatch.ElapsedMilliseconds, cancellationToken);
+
+        if (!apiResult.IsSupported)
+        {
+            connection.LastHealthCheckAt = DateTime.UtcNow;
+            connection.LastHealthCheckStatus = "ReauthenticationRequired";
+            connection.LastHealthCheckDetails = "La integración actual no soporta refresh directo.";
+            await _metaConnectionRepository.UpdateAsync(connection, cancellationToken);
+
+            await _auditService.LogAsync(_tenantProvider.GetUserId(), tenantId, "refresh token", nameof(MetaConnection), connection.Id.ToString(), JsonSerializer.Serialize(new { status = "ReauthenticationRequired" }), cancellationToken);
+
+            var unsupportedResult = new MetaConnectionTokenRefreshResultDto(connection.Id, false, true, connection.TokenExpiration, connection.Status.ToString(), "Reautenticación requerida para renovar token.");
+            return Result<MetaConnectionTokenRefreshResultDto>.Ok(unsupportedResult, "Refresh no soportado en flujo actual");
+        }
+
+        if (!apiResult.Success || string.IsNullOrWhiteSpace(apiResult.AccessToken))
+        {
+            connection.Status = ConnectionStatus.Invalid;
+            connection.LastHealthCheckAt = DateTime.UtcNow;
+            connection.LastHealthCheckStatus = "RefreshFailed";
+            connection.LastHealthCheckDetails = apiResult.Message;
+            await _metaConnectionRepository.UpdateAsync(connection, cancellationToken);
+
+            await _auditService.LogAsync(_tenantProvider.GetUserId(), tenantId, "refresh token", nameof(MetaConnection), connection.Id.ToString(), JsonSerializer.Serialize(new { status = "RefreshFailed", apiResult.Message }), cancellationToken);
+
+            var failedResult = new MetaConnectionTokenRefreshResultDto(connection.Id, false, true, connection.TokenExpiration, connection.Status.ToString(), "No se pudo refrescar el token. Reautenticación requerida.");
+            return Result<MetaConnectionTokenRefreshResultDto>.Ok(failedResult, "Refresh fallido");
+        }
+
+        connection.AccessToken = _secretEncryptionService.Encrypt(apiResult.AccessToken);
+        connection.TokenExpiration = apiResult.ExpiresAtUtc ?? DateTime.UtcNow.AddDays(60);
+        connection.Status = ConnectionStatus.Connected;
+        connection.LastHealthCheckAt = DateTime.UtcNow;
+        connection.LastHealthCheckStatus = "Healthy";
+        connection.LastHealthCheckDetails = "Token refrescado correctamente.";
+
+        await _metaConnectionRepository.UpdateAsync(connection, cancellationToken);
+
+        await _auditService.LogAsync(
+            _tenantProvider.GetUserId(),
+            tenantId,
+            "refresh token",
+            nameof(MetaConnection),
+            connection.Id.ToString(),
+            JsonSerializer.Serialize(new { status = "Refreshed", connection.TokenExpiration }),
+            cancellationToken);
+
+        var refreshedResult = new MetaConnectionTokenRefreshResultDto(connection.Id, true, false, connection.TokenExpiration, connection.Status.ToString(), "Token refrescado correctamente.");
+        return Result<MetaConnectionTokenRefreshResultDto>.Ok(refreshedResult, "Token refrescado correctamente");
+    }
+
+    private async Task LogApiAsync(string endpoint, string method, string requestJson, string responseJson, int statusCode, string status, long durationMs, CancellationToken cancellationToken)
+    {
+        _dbContext.ApiLogs.Add(new ApiLog
+        {
+            Provider = "Meta",
+            Endpoint = endpoint,
+            Method = method,
+            RequestJson = string.IsNullOrWhiteSpace(requestJson) ? "{}" : requestJson,
+            ResponseJson = string.IsNullOrWhiteSpace(responseJson) ? "{}" : responseJson,
+            Status = status,
+            StatusCode = statusCode,
+            DurationMs = durationMs,
+            TraceId = _tenantProvider.GetTraceId()
+        });
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
     private bool TryGetTenantId(out Guid tenantId)

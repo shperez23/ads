@@ -6,3 +6,5 @@ public sealed record MetaConnectionDto(Guid Id, string AppId, string BusinessId,
 public sealed record CreateMetaConnectionRequest(string AppId, string AppSecret, string AccessToken, string? RefreshToken, DateTime TokenExpiration, string BusinessId);
 public sealed record UpdateMetaConnectionRequest(string AppId, string AppSecret, string AccessToken, string? RefreshToken, DateTime TokenExpiration, string BusinessId);
 public sealed record MetaConnectionValidationResultDto(Guid ConnectionId, bool IsTokenValid, bool HasRequiredPermissions, ConnectionStatus Status, IReadOnlyCollection<string> MissingPermissions);
+
+public sealed record MetaConnectionTokenRefreshResultDto(Guid ConnectionId, bool Refreshed, bool RequiresReauthentication, DateTime? TokenExpiration, string Status, string Message);

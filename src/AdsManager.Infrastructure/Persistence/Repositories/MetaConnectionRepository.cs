@@ -23,6 +23,12 @@ public sealed class MetaConnectionRepository : IMetaConnectionRepository
     public Task<MetaConnection?> GetByIdAsync(Guid tenantId, Guid id, CancellationToken cancellationToken = default)
         => _dbContext.MetaConnections.FirstOrDefaultAsync(x => x.TenantId == tenantId && x.Id == id, cancellationToken);
 
+    public async Task<IReadOnlyCollection<MetaConnection>> GetConnectionsExpiringBeforeAsync(DateTime expiresBeforeUtc, CancellationToken cancellationToken = default)
+        => await _dbContext.MetaConnections
+            .Where(x => x.TokenExpiration <= expiresBeforeUtc)
+            .OrderBy(x => x.TokenExpiration)
+            .ToListAsync(cancellationToken);
+
     public async Task AddAsync(MetaConnection connection, CancellationToken cancellationToken = default)
     {
         _dbContext.MetaConnections.Add(connection);
