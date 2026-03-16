@@ -52,6 +52,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IAdRepository, AdRepository>();
         services.AddScoped<IInsightRepository, InsightRepository>();
         services.AddScoped<IMetaConnectionRepository, MetaConnectionRepository>();
+        services.AddScoped<IRuleRepository, RuleRepository>();
 
         services.AddScoped<SyncOrchestratorService>();
         services.AddScoped<SyncCampaignsJob>();
@@ -59,6 +60,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<SyncAdsJob>();
         services.AddScoped<SyncInsightsJob>();
         services.AddScoped<RefreshMetaTokenJob>();
+        services.AddScoped<RuleEvaluationJob>();
 
         services.AddHangfire(config => config
          .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
