@@ -17,7 +17,6 @@ using AdsManager.Infrastructure.Security;
 using FluentValidation;
 using FluentValidation.AspNetCore;
 using Hangfire;
-using Hangfire.Dashboard;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
@@ -173,8 +172,7 @@ using (var scope = app.Services.CreateScope())
 
 app.UseMiddleware<TraceContextMiddleware>();
 app.UseMiddleware<GlobalExceptionMiddleware>();
-app.UseSwagger();
-app.UseSwaggerUI();
+app.UseConfiguredSwagger();
 
 app.UseSerilogRequestLogging(options =>
 {
@@ -188,10 +186,7 @@ app.UseAuthentication();
 app.UseMiddleware<TenantMiddleware>();
 app.UseAuthorization();
 
-app.UseHangfireDashboard("/hangfire", new DashboardOptions
-{
-    Authorization = [new HangfireAdminAuthorizationFilter()]
-});
+app.UseConfiguredHangfireDashboard();
 app.RegisterRecurringSyncJobs();
 
 app.MapControllers();
