@@ -53,7 +53,7 @@ public sealed class RuleEvaluationJob
                         if (!shouldExecute)
                         {
                             await WriteLogAsync(rule, candidate, RuleExecutionStatus.Skipped, $"Condición no cumplida. MetricValue={candidate.MetricValue}", cancellationToken);
-                            _observabilityMetrics.RecordRuleExecution(rule.Action.ToString(), RuleExecutionStatus.Skipped);
+                            _observabilityMetrics.RecordRuleExecution(rule.Action.ToString(), RuleExecutionStatus.Skipped.ToString());
                             continue;
                         }
 
@@ -61,13 +61,13 @@ public sealed class RuleEvaluationJob
                         {
                             var details = await ExecuteActionAsync(rule, candidate, cancellationToken);
                             await WriteLogAsync(rule, candidate, RuleExecutionStatus.Success, details, cancellationToken);
-                            _observabilityMetrics.RecordRuleExecution(rule.Action.ToString(), RuleExecutionStatus.Success);
+                            _observabilityMetrics.RecordRuleExecution(rule.Action.ToString(), RuleExecutionStatus.Success.ToString());
                         }
                         catch (Exception ex)
                         {
                             Log.Error(ex, "Error ejecutando regla {RuleId} para entidad {EntityId}", rule.Id, candidate.EntityId);
                             await WriteLogAsync(rule, candidate, RuleExecutionStatus.Failed, ex.Message, cancellationToken);
-                            _observabilityMetrics.RecordRuleExecution(rule.Action.ToString(), RuleExecutionStatus.Failed);
+                            _observabilityMetrics.RecordRuleExecution(rule.Action.ToString(), RuleExecutionStatus.Failed.ToString());
                         }
                     }
                 }
