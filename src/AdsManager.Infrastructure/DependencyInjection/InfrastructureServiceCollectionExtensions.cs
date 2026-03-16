@@ -60,6 +60,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IMetaConnectionRepository, MetaConnectionRepository>();
         services.AddScoped<IRuleRepository, RuleRepository>();
 
+        services.AddScoped<IJobExecutionGuard, JobExecutionGuard>();
         services.AddScoped<SyncOrchestratorService>();
         services.AddScoped<SyncCampaignsJob>();
         services.AddScoped<SyncAdSetsJob>();

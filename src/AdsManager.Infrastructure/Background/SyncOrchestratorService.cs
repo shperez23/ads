@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using AdsManager.Application.Interfaces;
-using AdsManager.Domain.Entities;
 using AdsManager.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -12,15 +11,18 @@ public sealed class SyncOrchestratorService
     private readonly IApplicationDbContext _dbContext;
     private readonly ILogger<SyncOrchestratorService> _logger;
     private readonly IObservabilityMetrics _observabilityMetrics;
+    private readonly IJobExecutionGuard _jobExecutionGuard;
 
     public SyncOrchestratorService(
         IApplicationDbContext dbContext,
         ILogger<SyncOrchestratorService> logger,
-        IObservabilityMetrics observabilityMetrics)
+        IObservabilityMetrics observabilityMetrics,
+        IJobExecutionGuard jobExecutionGuard)
     {
         _dbContext = dbContext;
         _logger = logger;
         _observabilityMetrics = observabilityMetrics;
+        _jobExecutionGuard = jobExecutionGuard;
     }
 
     public async Task ExecutePerAccountAsync(
@@ -31,23 +33,15 @@ public sealed class SyncOrchestratorService
         CancellationToken cancellationToken = default)
     {
         var stopwatch = Stopwatch.StartNew();
-        var run = new SyncJobRun
-        {
-            JobName = jobName,
-            StartedAt = DateTime.UtcNow,
-            Status = "Running"
-        };
 
-        _dbContext.SyncJobRuns.Add(run);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        _logger.LogInformation(
+            "{JobName} started with filters TenantId={TenantId} AdAccountId={AdAccountId}",
+            jobName,
+            tenantId,
+            adAccountId);
 
         try
         {
-            _logger.LogInformation(
-                "{JobName} started with filters TenantId={TenantId} AdAccountId={AdAccountId}",
-                jobName,
-                tenantId,
-                adAccountId);
 
             var connectedTenantIdsQuery = _dbContext.MetaConnections.AsNoTracking()
                 .Where(x => x.Status == ConnectionStatus.Connected);
@@ -86,27 +80,35 @@ public sealed class SyncOrchestratorService
                     ["AdAccountId"] = account.MetaAccountId
                 });
 
-                _logger.LogInformation("Executing sync for tenant/account");
-                await executePerAccount(account.TenantId, account.MetaAccountId, cancellationToken);
-                _logger.LogInformation("Sync finished for tenant/account");
+                var lease = await _jobExecutionGuard.TryStartAsync(jobName, account.TenantId, account.MetaAccountId, cancellationToken);
+                if (!lease.Acquired)
+                {
+                    _logger.LogInformation("Skipped sync for tenant/account due to active execution");
+                    continue;
+                }
+
+                try
+                {
+                    _logger.LogInformation("Executing sync for tenant/account");
+                    await executePerAccount(account.TenantId, account.MetaAccountId, cancellationToken);
+                    await _jobExecutionGuard.CompleteAsync(lease, SyncJobRunStatus.Succeeded, cancellationToken: cancellationToken);
+                    _logger.LogInformation("Sync finished for tenant/account");
+                }
+                catch (Exception ex)
+                {
+                    await _jobExecutionGuard.CompleteAsync(lease, SyncJobRunStatus.Failed, ex.Message, cancellationToken);
+                    throw;
+                }
             }
 
-            run.Status = "Succeeded";
-            _observabilityMetrics.RecordSyncDuration(jobName, stopwatch.Elapsed.TotalMilliseconds, run.Status);
+            _observabilityMetrics.RecordSyncDuration(jobName, stopwatch.Elapsed.TotalMilliseconds, SyncJobRunStatus.Succeeded);
             _logger.LogInformation("{JobName} finished successfully in {ElapsedMs} ms", jobName, stopwatch.Elapsed.TotalMilliseconds);
         }
         catch (Exception ex)
         {
-            run.Status = "Failed";
-            run.Error = ex.Message;
-            _observabilityMetrics.RecordSyncDuration(jobName, stopwatch.Elapsed.TotalMilliseconds, run.Status);
+            _observabilityMetrics.RecordSyncDuration(jobName, stopwatch.Elapsed.TotalMilliseconds, SyncJobRunStatus.Failed);
             _logger.LogError(ex, "{JobName} failed after {ElapsedMs} ms", jobName, stopwatch.Elapsed.TotalMilliseconds);
             throw;
-        }
-        finally
-        {
-            run.FinishedAt = DateTime.UtcNow;
-            await _dbContext.SaveChangesAsync(cancellationToken);
         }
     }
 }
