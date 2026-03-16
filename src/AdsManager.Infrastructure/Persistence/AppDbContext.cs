@@ -17,7 +17,7 @@ public abstract class AppDbContext<TContext> : DbContext, IApplicationDbContext
         _tenantProvider = tenantProvider;
     }
 
-    private Guid? CurrentTenantId => _tenantProvider.GetTenantId();
+    protected Guid? CurrentTenantId => _tenantProvider.GetTenantId();
 
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<Role> Roles => Set<Role>();
@@ -73,7 +73,7 @@ public abstract class AppDbContext<TContext> : DbContext, IApplicationDbContext
             var tenantScopedEntity = Expression.Convert(parameter, typeof(ITenantScoped));
             var entityTenantId = Expression.Property(tenantScopedEntity, nameof(ITenantScoped.TenantId));
 
-            var contextExpression = Expression.Constant(this);
+            var contextExpression = Expression.Constant(this, typeof(AppDbContext<TContext>));
             var currentTenantIdExpression = Expression.Property(contextExpression, nameof(CurrentTenantId));
             var hasTenantExpression = Expression.Property(currentTenantIdExpression, nameof(Nullable<Guid>.HasValue));
             var tenantValueExpression = Expression.Property(currentTenantIdExpression, nameof(Nullable<Guid>.Value));
