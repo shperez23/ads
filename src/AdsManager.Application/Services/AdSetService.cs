@@ -19,8 +19,9 @@ public sealed class AdSetService : IAdSetService
     private readonly IMetaAdsService _metaAdsService;
     private readonly ITenantProvider _tenantProvider;
     private readonly IAuditService _auditService;
+    private readonly ICacheService _cacheService;
 
-    public AdSetService(ICampaignRepository campaignRepository, IAdSetRepository adSetRepository, IApplicationDbContext dbContext, IMetaAdsService metaAdsService, ITenantProvider tenantProvider, IAuditService auditService)
+    public AdSetService(ICampaignRepository campaignRepository, IAdSetRepository adSetRepository, IApplicationDbContext dbContext, IMetaAdsService metaAdsService, ITenantProvider tenantProvider, IAuditService auditService, ICacheService cacheService)
     {
         _campaignRepository = campaignRepository;
         _adSetRepository = adSetRepository;
@@ -28,6 +29,7 @@ public sealed class AdSetService : IAdSetService
         _metaAdsService = metaAdsService;
         _tenantProvider = tenantProvider;
         _auditService = auditService;
+        _cacheService = cacheService;
     }
 
     public async Task<Result<IReadOnlyCollection<AdSetDto>>> GetAdSetsAsync(CancellationToken cancellationToken = default)
@@ -87,6 +89,7 @@ public sealed class AdSetService : IAdSetService
         };
 
         await _adSetRepository.AddAsync(adSet, cancellationToken);
+        await InvalidateInsightsCacheAsync(tenantId, cancellationToken);
         await _auditService.LogAsync(_tenantProvider.GetUserId(), tenantId, "create adset", nameof(AdSet), adSet.Id.ToString(), JsonSerializer.Serialize(adSet), cancellationToken);
 
         return Result<AdSetDto>.Ok(Map(adSet), "AdSet creado correctamente");
@@ -117,6 +120,7 @@ public sealed class AdSetService : IAdSetService
         adSet.EndDate = request.EndDate;
 
         await _adSetRepository.UpdateAsync(adSet, cancellationToken);
+        await InvalidateInsightsCacheAsync(tenantId, cancellationToken);
         await _auditService.LogAsync(_tenantProvider.GetUserId(), tenantId, "update adset", nameof(AdSet), adSet.Id.ToString(), JsonSerializer.Serialize(request), cancellationToken);
 
         return Result<AdSetDto>.Ok(Map(adSet), "AdSet actualizado correctamente");
@@ -141,9 +145,16 @@ public sealed class AdSetService : IAdSetService
 
         adSet.Status = status;
         await _adSetRepository.UpdateAsync(adSet, cancellationToken);
+        await InvalidateInsightsCacheAsync(tenantId, cancellationToken);
         await _auditService.LogAsync(_tenantProvider.GetUserId(), tenantId, status == "PAUSED" ? "pause adset" : "activate adset", nameof(AdSet), adSet.Id.ToString(), JsonSerializer.Serialize(new { adSet.Status }), cancellationToken);
 
         return Result<AdSetDto>.Ok(Map(adSet), $"Estado actualizado a {status}");
+    }
+
+    private async Task InvalidateInsightsCacheAsync(Guid tenantId, CancellationToken cancellationToken)
+    {
+        foreach (var prefix in InsightsCacheKeys.TenantPrefixes(tenantId))
+            await _cacheService.RemoveByPrefixAsync(prefix, cancellationToken);
     }
 
     private bool TryGetTenantId(out Guid tenantId)
