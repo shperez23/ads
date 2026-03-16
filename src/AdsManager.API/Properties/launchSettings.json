@@ -4,7 +4,8 @@
       "commandName": "Project",
       "launchBrowser": true,
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ADSMANAGER_JWT_SECRET": "dev_only_change_me_32_chars_minimum_secret_key"
       },
       "applicationUrl": "https://localhost:61570;http://localhost:61571"
     }
