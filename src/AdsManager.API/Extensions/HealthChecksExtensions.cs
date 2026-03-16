@@ -21,7 +21,7 @@ public static class HealthChecksExtensions
             .AddCheck<DatabaseHealthCheck>("database", tags: ["ready"])
             .AddCheck<HangfireHealthCheck>("hangfire", tags: ["ready"])
             .AddCheck<MetaConnectionHealthSummaryCheck>("meta-connections-summary", tags: ["ready"])
-            .AddCheck("jwt-configuration", sp =>
+            .AddCheck("jwt-configuration", (sp, _) =>
             {
                 var jwtOptions = sp.GetRequiredService<IOptions<JwtOptions>>().Value;
                 var environment = sp.GetRequiredService<IWebHostEnvironment>();
@@ -45,7 +45,7 @@ public static class HealthChecksExtensions
                     ? HealthCheckResult.Healthy("Configuración mínima JWT válida.")
                     : HealthCheckResult.Unhealthy("Configuración JWT incompleta.", data: new Dictionary<string, object> { ["errors"] = errors });
             }, tags: ["ready"])
-            .AddCheck("data-protection-keys", sp =>
+            .AddCheck("data-protection-keys", (sp, _) =>
             {
                 var keyManager = sp.GetService<IKeyManager>();
                 if (keyManager is null)
