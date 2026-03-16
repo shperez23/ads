@@ -27,4 +27,7 @@ public sealed class TenantProvider : ITenantProvider
 
     public string GetTraceId()
         => _httpContextAccessor.HttpContext?.TraceIdentifier ?? string.Empty;
+
+    public string GetClientIp()
+        => _httpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString() ?? "unknown";
 }
