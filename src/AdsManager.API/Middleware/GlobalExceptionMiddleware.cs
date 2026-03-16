@@ -29,22 +29,29 @@ public sealed class GlobalExceptionMiddleware
             context.Response.ContentType = "application/json";
             context.Response.StatusCode = StatusCodes.Status500InternalServerError;
 
-            var response = _environment.IsDevelopment()
-                ? new
+            object response;
+
+            if (_environment.IsDevelopment())
+            {
+                response = new
                 {
                     success = false,
                     message = "Ocurrió un error inesperado",
                     details = ex.Message,
                     stackTrace = ex.StackTrace,
                     traceId
-                }
-                : new
+                };
+            }
+            else
+            {
+                response = new
                 {
                     success = false,
                     message = "Ocurrió un error inesperado",
                     details = "Contacte al administrador con el traceId",
                     traceId
                 };
+            }
 
             await context.Response.WriteAsync(JsonSerializer.Serialize(response));
         }
