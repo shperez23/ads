@@ -1,5 +1,6 @@
 using AdsManager.Application.Interfaces;
 using AdsManager.Application.Interfaces.Services;
+using AdsManager.Application.DTOs.AdAccounts;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using AdsManager.API.Authorization;
