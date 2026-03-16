@@ -19,5 +19,6 @@ public sealed class InsightDailyConfiguration : IEntityTypeConfiguration<Insight
 
         builder.HasIndex(x => new { x.TenantId, x.AdAccountId, x.Date });
         builder.HasIndex(x => new { x.TenantId, x.CampaignId, x.Date });
+        builder.HasIndex(x => new { x.TenantId, x.Date, x.CampaignId });
     }
 }

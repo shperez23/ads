@@ -442,6 +442,8 @@ namespace AdsManager.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("TenantId", "CampaignId", "Date");
 
+                    b.HasIndex("TenantId", "Date", "CampaignId");
+
                     b.ToTable("InsightsDaily", (string)null);
                 });
 
