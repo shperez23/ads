@@ -14,5 +14,4 @@ public sealed record CreateAdRequest(
     string Name,
     string Status,
     string CreativeJson,
-    string AccessToken,
     string? PreviewUrl);

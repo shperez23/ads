@@ -7,6 +7,7 @@ using AdsManager.Application.Interfaces.Repositories;
 using AdsManager.Application.Interfaces.Services;
 using AdsManager.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 namespace AdsManager.Application.Services;
 
@@ -25,7 +26,7 @@ public sealed class AdSetService : IAdSetService
         _metaAdsService = metaAdsService;
     }
 
-    public async Task<Result<AdSetDto>> CreateAsync(Guid tenantId, CreateAdSetRequest request, CancellationToken cancellationToken = default)
+    public async Task<Result<AdSetDto>> CreateAsync(Guid tenantId, Guid? userId, CreateAdSetRequest request, CancellationToken cancellationToken = default)
     {
         var campaign = await _campaignRepository.GetByIdAsync(tenantId, request.CampaignId, cancellationToken);
         if (campaign is null)
@@ -37,9 +38,8 @@ public sealed class AdSetService : IAdSetService
         if (adAccount is null)
             return Result<AdSetDto>.Fail("Ad account no encontrada");
 
-        var metaAdSetId = await _metaAdsService.CreateAdSetAsync(adAccount.MetaAccountId,
+        var metaAdSetId = await _metaAdsService.CreateAdSetAsync(tenantId, adAccount.MetaAccountId,
             new MetaAdSetCreateRequest(request.Name, campaign.MetaCampaignId, request.Status, request.DailyBudget, request.BillingEvent, request.OptimizationGoal, request.TargetingJson),
-            request.AccessToken,
             cancellationToken);
 
         var adSet = new AdSet
@@ -57,6 +57,16 @@ public sealed class AdSetService : IAdSetService
         };
 
         await _adSetRepository.AddAsync(adSet, cancellationToken);
+        _dbContext.AuditLogs.Add(new AuditLog
+        {
+            TenantId = tenantId,
+            UserId = userId ?? Guid.Empty,
+            Action = "create adset",
+            EntityName = nameof(AdSet),
+            EntityId = adSet.Id.ToString(),
+            PayloadJson = JsonSerializer.Serialize(adSet)
+        });
+        await _dbContext.SaveChangesAsync(cancellationToken);
 
         return Result<AdSetDto>.Ok(Map(adSet), "AdSet creado correctamente");
     }

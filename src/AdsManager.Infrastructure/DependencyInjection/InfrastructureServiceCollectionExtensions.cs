@@ -38,7 +38,8 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IAdRepository, AdRepository>();
         services.AddScoped<IInsightRepository, InsightRepository>();
 
-        services.AddScoped<InsightsSyncJob>();
+        services.AddScoped<SyncCampaignsJob>();
+        services.AddScoped<SyncInsightsJob>();
 
         services.AddHangfire(config => config
          .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)

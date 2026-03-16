@@ -2,6 +2,8 @@ namespace AdsManager.Application.DTOs.Meta;
 
 public sealed record MetaAdAccountDto(string Id, string Name, string AccountStatus, string Currency, string TimezoneName);
 public sealed record MetaCampaignDto(string Id, string Name, string Status, string Objective);
+public sealed record MetaAdSetDto(string Id, string CampaignId, string Name, string Status, decimal DailyBudget, string BillingEvent, string OptimizationGoal, string TargetingJson);
+public sealed record MetaAdDto(string Id, string AdSetId, string Name, string Status, string CreativeJson);
 public sealed record MetaCampaignCreateRequest(string Name, string Objective, string Status, long? DailyBudget, long? LifetimeBudget);
 public sealed record MetaCampaignStatusUpdateRequest(string CampaignId, string Status);
 public sealed record MetaAdSetCreateRequest(string Name, string CampaignId, string Status, long DailyBudget, string BillingEvent, string OptimizationGoal, string TargetingJson);

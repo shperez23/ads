@@ -59,22 +59,22 @@ public sealed class CampaignsController : ControllerBase
     }
 
     [HttpPut("{id:guid}/pause")]
-    public async Task<IActionResult> Pause([FromRoute] Guid id, [FromQuery] string accessToken, CancellationToken cancellationToken)
+    public async Task<IActionResult> Pause([FromRoute] Guid id, CancellationToken cancellationToken)
     {
         if (!TryGetTenantId(out var tenantId))
             return Unauthorized();
 
-        var result = await _campaignService.PauseAsync(tenantId, id, accessToken, cancellationToken);
+        var result = await _campaignService.PauseAsync(tenantId, id, GetUserId(), cancellationToken);
         return result.Success ? Ok(result) : NotFound(result);
     }
 
     [HttpPut("{id:guid}/activate")]
-    public async Task<IActionResult> Activate([FromRoute] Guid id, [FromQuery] string accessToken, CancellationToken cancellationToken)
+    public async Task<IActionResult> Activate([FromRoute] Guid id, CancellationToken cancellationToken)
     {
         if (!TryGetTenantId(out var tenantId))
             return Unauthorized();
 
-        var result = await _campaignService.ActivateAsync(tenantId, id, accessToken, cancellationToken);
+        var result = await _campaignService.ActivateAsync(tenantId, id, GetUserId(), cancellationToken);
         return result.Success ? Ok(result) : NotFound(result);
     }
 
@@ -83,4 +83,7 @@ public sealed class CampaignsController : ControllerBase
         var tenantClaim = User.FindFirstValue("tenantId");
         return Guid.TryParse(tenantClaim, out tenantId);
     }
+
+    private Guid? GetUserId()
+        => Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub"), out var userId) ? userId : null;
 }
