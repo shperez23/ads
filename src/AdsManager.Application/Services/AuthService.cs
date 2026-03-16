@@ -61,14 +61,14 @@ public sealed class AuthService : IAuthService
         _dbContext.RefreshTokens.Add(refreshToken);
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        user.Role = adminRole;
+        user.RoleNavigation = adminRole;
         return Result<AuthResponse>.Ok(BuildAuthResponse(user, refreshToken.Token), "Usuario registrado correctamente");
     }
 
     public async Task<Result<AuthResponse>> LoginAsync(LoginRequest request, CancellationToken cancellationToken = default)
     {
         var user = await _dbContext.Users
-            .Include(x => x.Role)
+            .Include(x => x.RoleNavigation)
             .FirstOrDefaultAsync(u => u.Email == request.Email.Trim().ToLowerInvariant(), cancellationToken);
 
         if (user is null || !_passwordHasher.Verify(request.Password, user.PasswordHash))
@@ -91,7 +91,7 @@ public sealed class AuthService : IAuthService
     {
         var existingRefreshToken = await _dbContext.RefreshTokens
             .Include(x => x.User)
-            .ThenInclude(x => x.Role)
+            .ThenInclude(x => x.RoleNavigation)
             .FirstOrDefaultAsync(rt => rt.Token == request.RefreshToken && !rt.IsRevoked, cancellationToken);
 
         if (existingRefreshToken is null || existingRefreshToken.ExpiresAt <= DateTime.UtcNow)
@@ -114,7 +114,7 @@ public sealed class AuthService : IAuthService
 
     public async Task<Result<UserProfileDto>> GetCurrentUserAsync(Guid userId, CancellationToken cancellationToken = default)
     {
-        var user = await _dbContext.Users.AsNoTracking().Include(x => x.Role).FirstOrDefaultAsync(x => x.Id == userId, cancellationToken);
+        var user = await _dbContext.Users.AsNoTracking().Include(x => x.RoleNavigation).FirstOrDefaultAsync(x => x.Id == userId, cancellationToken);
         if (user is null) return Result<UserProfileDto>.Fail("Usuario no encontrado");
 
         return Result<UserProfileDto>.Ok(_mapper.Map<UserProfileDto>(user));
