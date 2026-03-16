@@ -1,6 +1,8 @@
+using System.Linq.Expressions;
 using AdsManager.Application.Interfaces;
 using AdsManager.Domain.Common;
 using AdsManager.Domain.Entities;
+using AdsManager.Domain.Interfaces;
 using Microsoft.EntityFrameworkCore;
 
 namespace AdsManager.Infrastructure.Persistence;
@@ -8,9 +10,14 @@ namespace AdsManager.Infrastructure.Persistence;
 public abstract class AppDbContext<TContext> : DbContext, IApplicationDbContext
     where TContext : DbContext
 {
-    protected AppDbContext(DbContextOptions<TContext> options) : base(options)
+    private readonly ITenantProvider _tenantProvider;
+
+    protected AppDbContext(DbContextOptions<TContext> options, ITenantProvider tenantProvider) : base(options)
     {
+        _tenantProvider = tenantProvider;
     }
+
+    private Guid? CurrentTenantId => _tenantProvider.GetTenantId();
 
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<Role> Roles => Set<Role>();
@@ -29,6 +36,7 @@ public abstract class AppDbContext<TContext> : DbContext, IApplicationDbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(TContext).Assembly);
+        ApplyTenantQueryFilters(modelBuilder);
         base.OnModelCreating(modelBuilder);
     }
 
@@ -51,5 +59,30 @@ public abstract class AppDbContext<TContext> : DbContext, IApplicationDbContext
         }
 
         return base.SaveChangesAsync(cancellationToken);
+    }
+
+    private void ApplyTenantQueryFilters(ModelBuilder modelBuilder)
+    {
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            var clrType = entityType.ClrType;
+            if (!typeof(ITenantScoped).IsAssignableFrom(clrType))
+                continue;
+
+            var parameter = Expression.Parameter(clrType, "entity");
+            var tenantScopedEntity = Expression.Convert(parameter, typeof(ITenantScoped));
+            var entityTenantId = Expression.Property(tenantScopedEntity, nameof(ITenantScoped.TenantId));
+
+            var contextExpression = Expression.Constant(this);
+            var currentTenantIdExpression = Expression.Property(contextExpression, nameof(CurrentTenantId));
+            var hasTenantExpression = Expression.Property(currentTenantIdExpression, nameof(Nullable<Guid>.HasValue));
+            var tenantValueExpression = Expression.Property(currentTenantIdExpression, nameof(Nullable<Guid>.Value));
+
+            var tenantMatchExpression = Expression.Equal(entityTenantId, tenantValueExpression);
+            var body = Expression.OrElse(Expression.Not(hasTenantExpression), tenantMatchExpression);
+
+            var lambda = Expression.Lambda(body, parameter);
+            modelBuilder.Entity(clrType).HasQueryFilter(lambda);
+        }
     }
 }

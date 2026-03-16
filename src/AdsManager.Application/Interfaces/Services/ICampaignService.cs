@@ -5,10 +5,10 @@ namespace AdsManager.Application.Interfaces.Services;
 
 public interface ICampaignService
 {
-    Task<Result<IReadOnlyCollection<CampaignDto>>> GetAllAsync(Guid tenantId, CancellationToken cancellationToken = default);
-    Task<Result<CampaignDto>> GetByIdAsync(Guid tenantId, Guid campaignId, CancellationToken cancellationToken = default);
-    Task<Result<CampaignDto>> CreateAsync(Guid tenantId, CreateCampaignRequest request, CancellationToken cancellationToken = default);
-    Task<Result<CampaignDto>> UpdateAsync(Guid tenantId, Guid campaignId, UpdateCampaignRequest request, CancellationToken cancellationToken = default);
-    Task<Result<CampaignDto>> PauseAsync(Guid tenantId, Guid campaignId, Guid? userId, CancellationToken cancellationToken = default);
-    Task<Result<CampaignDto>> ActivateAsync(Guid tenantId, Guid campaignId, Guid? userId, CancellationToken cancellationToken = default);
+    Task<Result<IReadOnlyCollection<CampaignDto>>> GetAllAsync(CancellationToken cancellationToken = default);
+    Task<Result<CampaignDto>> GetByIdAsync(Guid campaignId, CancellationToken cancellationToken = default);
+    Task<Result<CampaignDto>> CreateAsync(CreateCampaignRequest request, CancellationToken cancellationToken = default);
+    Task<Result<CampaignDto>> UpdateAsync(Guid campaignId, UpdateCampaignRequest request, CancellationToken cancellationToken = default);
+    Task<Result<CampaignDto>> PauseAsync(Guid campaignId, CancellationToken cancellationToken = default);
+    Task<Result<CampaignDto>> ActivateAsync(Guid campaignId, CancellationToken cancellationToken = default);
 }

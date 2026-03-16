@@ -16,26 +16,32 @@ public sealed class AdsService : IAdsService
     private readonly IAdRepository _adRepository;
     private readonly IMetaAdsService _metaAdsService;
     private readonly IApplicationDbContext _dbContext;
+    private readonly ITenantProvider _tenantProvider;
 
-    public AdsService(IAdSetRepository adSetRepository, IAdRepository adRepository, IMetaAdsService metaAdsService, IApplicationDbContext dbContext)
+    public AdsService(IAdSetRepository adSetRepository, IAdRepository adRepository, IMetaAdsService metaAdsService, IApplicationDbContext dbContext, ITenantProvider tenantProvider)
     {
         _adSetRepository = adSetRepository;
         _adRepository = adRepository;
         _metaAdsService = metaAdsService;
         _dbContext = dbContext;
+        _tenantProvider = tenantProvider;
     }
 
-    public async Task<Result<AdDto>> CreateAsync(Guid tenantId, Guid? userId, CreateAdRequest request, CancellationToken cancellationToken = default)
+    public async Task<Result<AdDto>> CreateAsync(CreateAdRequest request, CancellationToken cancellationToken = default)
     {
-        var adSet = await _adSetRepository.GetByIdAsync(tenantId, request.AdSetId, cancellationToken);
+        var tenantId = _tenantProvider.GetTenantId();
+        if (!tenantId.HasValue)
+            return Result<AdDto>.Fail("Tenant no resuelto");
+
+        var adSet = await _adSetRepository.GetByIdAsync(tenantId.Value, request.AdSetId, cancellationToken);
         if (adSet is null)
             return Result<AdDto>.Fail("AdSet no encontrado");
 
-        var metaAdId = await _metaAdsService.CreateAdAsync(tenantId, new MetaAdCreateRequest(request.Name, adSet.MetaAdSetId, request.Status, request.CreativeJson), cancellationToken);
+        var metaAdId = await _metaAdsService.CreateAdAsync(tenantId.Value, new MetaAdCreateRequest(request.Name, adSet.MetaAdSetId, request.Status, request.CreativeJson), cancellationToken);
 
         var ad = new Ad
         {
-            TenantId = tenantId,
+            TenantId = tenantId.Value,
             AdSetId = adSet.Id,
             MetaAdId = metaAdId,
             Name = request.Name,
@@ -47,8 +53,8 @@ public sealed class AdsService : IAdsService
         await _adRepository.AddAsync(ad, cancellationToken);
         _dbContext.AuditLogs.Add(new AuditLog
         {
-            TenantId = tenantId,
-            UserId = userId ?? Guid.Empty,
+            TenantId = tenantId.Value,
+            UserId = _tenantProvider.GetUserId() ?? Guid.Empty,
             Action = "create ad",
             EntityName = nameof(Ad),
             EntityId = ad.Id.ToString(),
