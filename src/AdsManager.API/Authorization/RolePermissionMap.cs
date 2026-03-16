@@ -18,6 +18,8 @@ public static class RolePermissionMap
                 AuthorizationPolicies.ReportsRead,
                 AuthorizationPolicies.MetaConnectionsManage,
                 AuthorizationPolicies.AdAccountsManage,
+                AuthorizationPolicies.RulesRead,
+                AuthorizationPolicies.RulesWrite,
                 AuthorizationPolicies.SystemAdmin
             ],
             [UserRole.Manager.ToString()] =
@@ -30,14 +32,17 @@ public static class RolePermissionMap
                 AuthorizationPolicies.AdsWrite,
                 AuthorizationPolicies.ReportsRead,
                 AuthorizationPolicies.MetaConnectionsManage,
-                AuthorizationPolicies.AdAccountsManage
+                AuthorizationPolicies.AdAccountsManage,
+                AuthorizationPolicies.RulesRead,
+                AuthorizationPolicies.RulesWrite
             ],
             [UserRole.Analyst.ToString()] =
             [
                 AuthorizationPolicies.CampaignsRead,
                 AuthorizationPolicies.AdSetsRead,
                 AuthorizationPolicies.AdsRead,
-                AuthorizationPolicies.ReportsRead
+                AuthorizationPolicies.ReportsRead,
+                AuthorizationPolicies.RulesRead
             ]
         };
 

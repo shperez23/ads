@@ -32,6 +32,11 @@ public static class HangfireRecurringJobsExtensions
             job => job.ExecuteAsync(7, default),
             "0 * * * *");
 
+        RecurringJob.AddOrUpdate<RuleEvaluationJob>(
+            "evaluate-rules-hourly",
+            job => job.ExecuteAsync(default),
+            "5 * * * *");
+
         return app;
     }
 }

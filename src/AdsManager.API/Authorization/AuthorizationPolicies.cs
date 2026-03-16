@@ -11,6 +11,8 @@ public static class AuthorizationPolicies
     public const string ReportsRead = "Reports.Read";
     public const string MetaConnectionsManage = "MetaConnections.Manage";
     public const string AdAccountsManage = "AdAccounts.Manage";
+    public const string RulesRead = "Rules.Read";
+    public const string RulesWrite = "Rules.Write";
     public const string SystemAdmin = "System.Admin";
 
     public static readonly string[] All =
@@ -24,6 +26,8 @@ public static class AuthorizationPolicies
         ReportsRead,
         MetaConnectionsManage,
         AdAccountsManage,
+        RulesRead,
+        RulesWrite,
         SystemAdmin
     ];
 }
