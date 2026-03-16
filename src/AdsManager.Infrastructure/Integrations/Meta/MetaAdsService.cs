@@ -16,12 +16,14 @@ public sealed class MetaAdsService : IMetaAdsService
     private readonly HttpClient _httpClient;
     private readonly IApplicationDbContext _dbContext;
     private readonly ILogger<MetaAdsService> _logger;
+    private readonly ISecretEncryptionService _secretEncryptionService;
 
-    public MetaAdsService(HttpClient httpClient, IApplicationDbContext dbContext, ILogger<MetaAdsService> logger)
+    public MetaAdsService(HttpClient httpClient, IApplicationDbContext dbContext, ILogger<MetaAdsService> logger, ISecretEncryptionService secretEncryptionService)
     {
         _httpClient = httpClient;
         _dbContext = dbContext;
         _logger = logger;
+        _secretEncryptionService = secretEncryptionService;
         _httpClient.BaseAddress = new Uri(BaseUrl);
     }
 
@@ -340,7 +342,7 @@ public sealed class MetaAdsService : IMetaAdsService
             .FirstOrDefaultAsync(x => x.TenantId == tenantId, cancellationToken)
             ?? throw new InvalidOperationException("No hay conexión de Meta configurada para el tenant.");
 
-        return connection.AccessToken;
+        return _secretEncryptionService.Decrypt(connection.AccessToken);
     }
 
     private async Task<AdAccount> GetAdAccountAsync(Guid tenantId, string adAccountId, CancellationToken cancellationToken)

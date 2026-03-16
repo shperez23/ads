@@ -30,13 +30,17 @@ public static class InfrastructureServiceCollectionExtensions
             sp.GetRequiredService<AdsManagerDbContext>());
 
         services.AddScoped<IPasswordHasher, PasswordHasher>();
+        services.AddDataProtection();
         services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
+        services.AddScoped<ISecretEncryptionService, SecretEncryptionService>();
 
         services.AddHttpClient<IMetaAdsService, MetaAdsService>();
+        services.AddHttpClient<IMetaConnectionApiClient, MetaConnectionApiClient>();
         services.AddScoped<ICampaignRepository, CampaignRepository>();
         services.AddScoped<IAdSetRepository, AdSetRepository>();
         services.AddScoped<IAdRepository, AdRepository>();
         services.AddScoped<IInsightRepository, InsightRepository>();
+        services.AddScoped<IMetaConnectionRepository, MetaConnectionRepository>();
 
         services.AddScoped<SyncCampaignsJob>();
         services.AddScoped<SyncInsightsJob>();
