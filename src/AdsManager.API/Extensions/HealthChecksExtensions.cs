@@ -1,10 +1,7 @@
 using System.Text.Json;
 using AdsManager.API.HealthChecks;
 using AdsManager.Application.Configuration;
-using AdsManager.Infrastructure.Security;
-using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
-using Microsoft.Extensions.Options;
 
 namespace AdsManager.API.Extensions;
 
@@ -21,50 +18,8 @@ public static class HealthChecksExtensions
             .AddCheck<DatabaseHealthCheck>("database", tags: ["ready"])
             .AddCheck<HangfireHealthCheck>("hangfire", tags: ["ready"])
             .AddCheck<MetaConnectionHealthSummaryCheck>("meta-connections-summary", tags: ["ready"])
-            .AddCheck("jwt-configuration", (sp, _) =>
-            {
-                var jwtOptions = sp.GetRequiredService<IOptions<JwtOptions>>().Value;
-                var environment = sp.GetRequiredService<IWebHostEnvironment>();
-                var errors = new List<string>();
-
-                if (string.IsNullOrWhiteSpace(jwtOptions.Issuer))
-                    errors.Add("Issuer no configurado");
-                if (string.IsNullOrWhiteSpace(jwtOptions.Audience))
-                    errors.Add("Audience no configurado");
-
-                var effectiveSecret = Environment.GetEnvironmentVariable("ADSMANAGER_JWT_SECRET") ?? jwtOptions.SecretKey;
-                if (string.IsNullOrWhiteSpace(effectiveSecret) || effectiveSecret.Length < 32)
-                {
-                    if (!environment.IsDevelopment())
-                    {
-                        errors.Add("SecretKey inválido o menor a 32 caracteres");
-                    }
-                }
-
-                return errors.Count == 0
-                    ? HealthCheckResult.Healthy("Configuración mínima JWT válida.")
-                    : HealthCheckResult.Unhealthy("Configuración JWT incompleta.", data: new Dictionary<string, object> { ["errors"] = errors });
-            }, tags: ["ready"])
-            .AddCheck("data-protection-keys", (sp, _) =>
-            {
-                var keyManager = sp.GetService<IKeyManager>();
-                if (keyManager is null)
-                {
-                    return HealthCheckResult.Healthy("DataProtection no requiere key manager en este host.");
-                }
-
-                var keys = keyManager.GetAllKeys();
-                if (!keys.Any())
-                {
-                    return HealthCheckResult.Degraded("No se encontraron DataProtection keys activas.");
-                }
-
-                return HealthCheckResult.Healthy("DataProtection keys disponibles.", new Dictionary<string, object>
-                {
-                    ["keys"] = keys.Count,
-                    ["hasRevokedKeys"] = keys.Any(k => k.IsRevoked)
-                });
-            }, tags: ["ready"]);
+            .AddCheck<JwtConfigurationHealthCheck>("jwt-configuration", tags: ["ready"])
+            .AddCheck<DataProtectionKeysHealthCheck>("data-protection-keys", tags: ["ready"]);
 
         return services;
     }
