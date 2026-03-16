@@ -3,6 +3,7 @@ using AdsManager.Application.Interfaces;
 using AdsManager.Application.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using AdsManager.API.Authorization;
 
 namespace AdsManager.API.Controllers;
 
@@ -21,6 +22,7 @@ public sealed class MetaConnectionsController : ControllerBase
     }
 
     [HttpGet]
+    [Authorize(Policy = AuthorizationPolicies.MetaConnectionsManage)]
     public async Task<IActionResult> GetConnections(CancellationToken cancellationToken)
     {
         if (!_tenantProvider.GetTenantId().HasValue)
@@ -31,6 +33,7 @@ public sealed class MetaConnectionsController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Policy = AuthorizationPolicies.MetaConnectionsManage)]
     public async Task<IActionResult> CreateConnection([FromBody] CreateMetaConnectionRequest request, CancellationToken cancellationToken)
     {
         if (!_tenantProvider.GetTenantId().HasValue)
@@ -41,6 +44,7 @@ public sealed class MetaConnectionsController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
+    [Authorize(Policy = AuthorizationPolicies.MetaConnectionsManage)]
     public async Task<IActionResult> UpdateConnection([FromRoute] Guid id, [FromBody] UpdateMetaConnectionRequest request, CancellationToken cancellationToken)
     {
         if (!_tenantProvider.GetTenantId().HasValue)
@@ -51,6 +55,7 @@ public sealed class MetaConnectionsController : ControllerBase
     }
 
     [HttpDelete("{id:guid}")]
+    [Authorize(Policy = AuthorizationPolicies.MetaConnectionsManage)]
     public async Task<IActionResult> DeleteConnection([FromRoute] Guid id, CancellationToken cancellationToken)
     {
         if (!_tenantProvider.GetTenantId().HasValue)
@@ -62,6 +67,7 @@ public sealed class MetaConnectionsController : ControllerBase
 
 
     [HttpPost("{id:guid}/refresh-token")]
+    [Authorize(Policy = AuthorizationPolicies.MetaConnectionsManage)]
     public async Task<IActionResult> RefreshToken([FromRoute] Guid id, CancellationToken cancellationToken)
     {
         if (!_tenantProvider.GetTenantId().HasValue)
@@ -72,6 +78,7 @@ public sealed class MetaConnectionsController : ControllerBase
     }
 
     [HttpPost("{id:guid}/validate")]
+    [Authorize(Policy = AuthorizationPolicies.MetaConnectionsManage)]
     public async Task<IActionResult> ValidateConnection([FromRoute] Guid id, CancellationToken cancellationToken)
     {
         if (!_tenantProvider.GetTenantId().HasValue)

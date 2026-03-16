@@ -3,6 +3,7 @@ using AdsManager.Application.Interfaces;
 using AdsManager.Application.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using AdsManager.API.Authorization;
 
 namespace AdsManager.API.Controllers;
 
@@ -23,6 +24,7 @@ public sealed class AdsController : ControllerBase
     }
 
     [HttpGet]
+    [Authorize(Policy = AuthorizationPolicies.AdsRead)]
     public async Task<IActionResult> GetAds(CancellationToken cancellationToken)
     {
         if (!_tenantProvider.GetTenantId().HasValue)
@@ -33,6 +35,7 @@ public sealed class AdsController : ControllerBase
     }
 
     [HttpGet("{id:guid}")]
+    [Authorize(Policy = AuthorizationPolicies.AdsRead)]
     public async Task<IActionResult> GetAdById([FromRoute] Guid id, CancellationToken cancellationToken)
     {
         if (!_tenantProvider.GetTenantId().HasValue)
@@ -44,6 +47,7 @@ public sealed class AdsController : ControllerBase
 
 
     [HttpGet("{id:guid}/insights")]
+    [Authorize(Policy = AuthorizationPolicies.ReportsRead)]
     public async Task<IActionResult> GetInsightsByAd([FromRoute] Guid id, [FromQuery] DateOnly? dateFrom, [FromQuery] DateOnly? dateTo, CancellationToken cancellationToken)
     {
         if (!_tenantProvider.GetTenantId().HasValue)
@@ -54,6 +58,7 @@ public sealed class AdsController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Policy = AuthorizationPolicies.AdsWrite)]
     public async Task<IActionResult> Create([FromBody] CreateAdRequest request, CancellationToken cancellationToken)
     {
         if (!_tenantProvider.GetTenantId().HasValue)
@@ -64,6 +69,7 @@ public sealed class AdsController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
+    [Authorize(Policy = AuthorizationPolicies.AdsWrite)]
     public async Task<IActionResult> UpdateAd([FromRoute] Guid id, [FromBody] UpdateAdRequest request, CancellationToken cancellationToken)
     {
         if (!_tenantProvider.GetTenantId().HasValue)
@@ -74,6 +80,7 @@ public sealed class AdsController : ControllerBase
     }
 
     [HttpPut("{id:guid}/pause")]
+    [Authorize(Policy = AuthorizationPolicies.AdsWrite)]
     public async Task<IActionResult> PauseAd([FromRoute] Guid id, CancellationToken cancellationToken)
     {
         if (!_tenantProvider.GetTenantId().HasValue)
@@ -84,6 +91,7 @@ public sealed class AdsController : ControllerBase
     }
 
     [HttpPut("{id:guid}/activate")]
+    [Authorize(Policy = AuthorizationPolicies.AdsWrite)]
     public async Task<IActionResult> ActivateAd([FromRoute] Guid id, CancellationToken cancellationToken)
     {
         if (!_tenantProvider.GetTenantId().HasValue)

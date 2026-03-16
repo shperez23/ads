@@ -2,6 +2,7 @@ using AdsManager.Application.Interfaces;
 using AdsManager.Application.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using AdsManager.API.Authorization;
 
 namespace AdsManager.API.Controllers;
 
@@ -20,6 +21,7 @@ public sealed class AdAccountsController : ControllerBase
     }
 
     [HttpGet]
+    [Authorize(Policy = AuthorizationPolicies.AdAccountsManage)]
     public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
     {
         if (!_tenantProvider.GetTenantId().HasValue)
@@ -30,6 +32,7 @@ public sealed class AdAccountsController : ControllerBase
     }
 
     [HttpPost("import-from-meta")]
+    [Authorize(Policy = AuthorizationPolicies.AdAccountsManage)]
     public async Task<IActionResult> ImportFromMeta(CancellationToken cancellationToken)
     {
         if (!_tenantProvider.GetTenantId().HasValue)
@@ -40,6 +43,7 @@ public sealed class AdAccountsController : ControllerBase
     }
 
     [HttpPost("{id:guid}/sync")]
+    [Authorize(Policy = AuthorizationPolicies.AdAccountsManage)]
     public async Task<IActionResult> Sync([FromRoute] Guid id, CancellationToken cancellationToken)
     {
         if (!_tenantProvider.GetTenantId().HasValue)
