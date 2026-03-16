@@ -40,6 +40,17 @@ public sealed class AdsController : ControllerBase
         return result.Success ? Ok(result) : NotFound(result);
     }
 
+
+    [HttpPost]
+    public async Task<IActionResult> Create([FromBody] CreateAdRequest request, CancellationToken cancellationToken)
+    {
+        if (!_tenantProvider.GetTenantId().HasValue)
+            return Unauthorized();
+
+        var result = await _adsService.CreateAdAsync(request, cancellationToken);
+        return result.Success ? Ok(result) : BadRequest(result);
+    }
+
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> UpdateAd([FromRoute] Guid id, [FromBody] UpdateAdRequest request, CancellationToken cancellationToken)
     {

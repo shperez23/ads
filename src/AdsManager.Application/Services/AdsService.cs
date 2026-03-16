@@ -47,6 +47,9 @@ public sealed class AdsService : IAdsService
             : Result<AdDto>.Ok(Map(ad));
     }
 
+    public Task<Result<AdDto>> CreateAdAsync(CreateAdRequest request, CancellationToken cancellationToken = default)
+        => CreateAsync(request, cancellationToken);
+
     public async Task<Result<AdDto>> CreateAsync(CreateAdRequest request, CancellationToken cancellationToken = default)
     {
         if (!TryGetTenantId(out var tenantId))

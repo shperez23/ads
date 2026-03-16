@@ -50,6 +50,9 @@ public sealed class AdSetService : IAdSetService
             : Result<AdSetDto>.Ok(Map(adSet));
     }
 
+    public Task<Result<AdSetDto>> CreateAdSetAsync(CreateAdSetRequest request, CancellationToken cancellationToken = default)
+        => CreateAsync(request, cancellationToken);
+
     public async Task<Result<AdSetDto>> CreateAsync(CreateAdSetRequest request, CancellationToken cancellationToken = default)
     {
         if (!TryGetTenantId(out var tenantId))
