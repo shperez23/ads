@@ -1,0 +1,72 @@
+using AdsManager.Application.DTOs.AdSets;
+using AdsManager.Application.Interfaces;
+using AdsManager.Application.Interfaces.Services;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+
+namespace AdsManager.API.Controllers;
+
+[ApiController]
+[Authorize]
+[Route("api/adsets")]
+public sealed class AdSetsController : ControllerBase
+{
+    private readonly IAdSetService _adSetService;
+    private readonly ITenantProvider _tenantProvider;
+
+    public AdSetsController(IAdSetService adSetService, ITenantProvider tenantProvider)
+    {
+        _adSetService = adSetService;
+        _tenantProvider = tenantProvider;
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> GetAdSets(CancellationToken cancellationToken)
+    {
+        if (!_tenantProvider.GetTenantId().HasValue)
+            return Unauthorized();
+
+        var result = await _adSetService.GetAdSetsAsync(cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpGet("{id:guid}")]
+    public async Task<IActionResult> GetAdSetById([FromRoute] Guid id, CancellationToken cancellationToken)
+    {
+        if (!_tenantProvider.GetTenantId().HasValue)
+            return Unauthorized();
+
+        var result = await _adSetService.GetAdSetByIdAsync(id, cancellationToken);
+        return result.Success ? Ok(result) : NotFound(result);
+    }
+
+    [HttpPut("{id:guid}")]
+    public async Task<IActionResult> UpdateAdSet([FromRoute] Guid id, [FromBody] UpdateAdSetRequest request, CancellationToken cancellationToken)
+    {
+        if (!_tenantProvider.GetTenantId().HasValue)
+            return Unauthorized();
+
+        var result = await _adSetService.UpdateAdSetAsync(id, request, cancellationToken);
+        return result.Success ? Ok(result) : NotFound(result);
+    }
+
+    [HttpPut("{id:guid}/pause")]
+    public async Task<IActionResult> PauseAdSet([FromRoute] Guid id, CancellationToken cancellationToken)
+    {
+        if (!_tenantProvider.GetTenantId().HasValue)
+            return Unauthorized();
+
+        var result = await _adSetService.PauseAdSetAsync(id, cancellationToken);
+        return result.Success ? Ok(result) : NotFound(result);
+    }
+
+    [HttpPut("{id:guid}/activate")]
+    public async Task<IActionResult> ActivateAdSet([FromRoute] Guid id, CancellationToken cancellationToken)
+    {
+        if (!_tenantProvider.GetTenantId().HasValue)
+            return Unauthorized();
+
+        var result = await _adSetService.ActivateAdSetAsync(id, cancellationToken);
+        return result.Success ? Ok(result) : NotFound(result);
+    }
+}

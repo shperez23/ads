@@ -23,3 +23,14 @@ public sealed record CreateAdSetRequest(
     string OptimizationGoal,
     string TargetingJson,
     string BidStrategy = "LOWEST_COST_WITHOUT_CAP");
+
+public sealed record UpdateAdSetRequest(
+    string Name,
+    string Status,
+    decimal Budget,
+    string BillingEvent,
+    string OptimizationGoal,
+    string TargetingJson,
+    string BidStrategy,
+    DateTime? StartDate,
+    DateTime? EndDate);

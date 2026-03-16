@@ -9,6 +9,8 @@ public interface IMetaAdsService
     Task<string> CreateCampaignAsync(Guid tenantId, string adAccountId, MetaCampaignCreateRequest request, CancellationToken cancellationToken = default);
     Task UpdateCampaignStatusAsync(Guid tenantId, MetaCampaignStatusUpdateRequest request, CancellationToken cancellationToken = default);
     Task<string> CreateAdSetAsync(Guid tenantId, string adAccountId, MetaAdSetCreateRequest request, CancellationToken cancellationToken = default);
+    Task UpdateAdSetAsync(Guid tenantId, MetaAdSetUpdateRequest request, CancellationToken cancellationToken = default);
+    Task UpdateAdSetStatusAsync(Guid tenantId, MetaAdSetStatusUpdateRequest request, CancellationToken cancellationToken = default);
     Task<string> CreateAdAsync(Guid tenantId, MetaAdCreateRequest request, CancellationToken cancellationToken = default);
     Task<IReadOnlyCollection<MetaInsightDto>> GetInsightsAsync(Guid tenantId, string adAccountId, DateOnly since, DateOnly until, CancellationToken cancellationToken = default);
     Task SyncCampaignsAsync(Guid tenantId, string adAccountId, CancellationToken cancellationToken = default);

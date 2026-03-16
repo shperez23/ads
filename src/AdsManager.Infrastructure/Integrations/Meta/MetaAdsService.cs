@@ -87,6 +87,25 @@ public sealed class MetaAdsService : IMetaAdsService
         return adSetId;
     }
 
+
+    public Task UpdateAdSetAsync(Guid tenantId, MetaAdSetUpdateRequest request, CancellationToken cancellationToken = default)
+        => PostAsync(
+            tenantId,
+            request.AdSetId,
+            new Dictionary<string, string>
+            {
+                ["name"] = request.Name,
+                ["status"] = request.Status,
+                ["daily_budget"] = Convert.ToInt64(request.DailyBudget).ToString(),
+                ["billing_event"] = request.BillingEvent,
+                ["optimization_goal"] = request.OptimizationGoal,
+                ["targeting"] = request.TargetingJson
+            },
+            cancellationToken);
+
+    public Task UpdateAdSetStatusAsync(Guid tenantId, MetaAdSetStatusUpdateRequest request, CancellationToken cancellationToken = default)
+        => PostAsync(tenantId, request.AdSetId, new Dictionary<string, string> { ["status"] = request.Status }, cancellationToken);
+
     public Task<string> CreateAdAsync(Guid tenantId, MetaAdCreateRequest request, CancellationToken cancellationToken = default)
         => PostForIdAsync(tenantId,
             "ads",
