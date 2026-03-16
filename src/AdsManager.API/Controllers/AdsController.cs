@@ -25,12 +25,12 @@ public sealed class AdsController : ControllerBase
 
     [HttpGet]
     [Authorize(Policy = AuthorizationPolicies.AdsRead)]
-    public async Task<IActionResult> GetAds(CancellationToken cancellationToken)
+    public async Task<IActionResult> GetAds([FromQuery] AdListRequest request, CancellationToken cancellationToken)
     {
         if (!_tenantProvider.GetTenantId().HasValue)
             return Unauthorized();
 
-        var result = await _adsService.GetAdsAsync(cancellationToken);
+        var result = await _adsService.GetAdsAsync(request, cancellationToken);
         return Ok(result);
     }
 

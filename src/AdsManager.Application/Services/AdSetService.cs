@@ -1,5 +1,6 @@
 using AdsManager.Application.Common;
 using AdsManager.Application.DTOs.AdSets;
+using AdsManager.Application.DTOs.Common;
 using AdsManager.Application.DTOs.Meta;
 using AdsManager.Application.Interfaces;
 using AdsManager.Application.Interfaces.Meta;
@@ -32,13 +33,17 @@ public sealed class AdSetService : IAdSetService
         _cacheService = cacheService;
     }
 
-    public async Task<Result<IReadOnlyCollection<AdSetDto>>> GetAdSetsAsync(CancellationToken cancellationToken = default)
+    public async Task<Result<PagedResponse<AdSetDto>>> GetAdSetsAsync(AdSetListRequest request, CancellationToken cancellationToken = default)
     {
         if (!TryGetTenantId(out var tenantId))
-            return Result<IReadOnlyCollection<AdSetDto>>.Fail("Tenant no resuelto");
+            return Result<PagedResponse<AdSetDto>>.Fail("Tenant no resuelto");
 
-        var adSets = await _adSetRepository.GetByTenantAsync(tenantId, cancellationToken);
-        return Result<IReadOnlyCollection<AdSetDto>>.Ok(adSets.Select(Map).ToArray());
+        var (items, total) = await _adSetRepository.GetPagedByTenantAsync(tenantId, request, cancellationToken);
+        var page = request.NormalizedPage;
+        var pageSize = request.NormalizedPageSize;
+        var totalPages = (int)Math.Ceiling(total / (double)pageSize);
+
+        return Result<PagedResponse<AdSetDto>>.Ok(new PagedResponse<AdSetDto>(items.Select(Map).ToArray(), page, pageSize, total, totalPages));
     }
 
     public async Task<Result<AdSetDto>> GetAdSetByIdAsync(Guid adSetId, CancellationToken cancellationToken = default)

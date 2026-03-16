@@ -1,3 +1,5 @@
+using AdsManager.Application.DTOs.Common;
+
 namespace AdsManager.Application.DTOs.AdSets;
 
 public sealed record AdSetDto(
@@ -34,3 +36,9 @@ public sealed record UpdateAdSetRequest(
     string BidStrategy,
     DateTime? StartDate,
     DateTime? EndDate);
+
+public sealed record AdSetListRequest : PagedRequest
+{
+    public string? Status { get; init; }
+    public Guid? CampaignId { get; init; }
+}

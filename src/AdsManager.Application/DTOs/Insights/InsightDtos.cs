@@ -1,3 +1,5 @@
+using AdsManager.Application.DTOs.Common;
+
 namespace AdsManager.Application.DTOs.Insights;
 
 public sealed record InsightDto(
@@ -15,3 +17,11 @@ public sealed record InsightDto(
     decimal Cpm,
     decimal Cpc,
     decimal Ctr);
+
+public sealed record InsightListRequest : PagedRequest
+{
+    public Guid? CampaignId { get; init; }
+    public Guid? AdAccountId { get; init; }
+    public DateOnly? DateFrom { get; init; }
+    public DateOnly? DateTo { get; init; }
+}

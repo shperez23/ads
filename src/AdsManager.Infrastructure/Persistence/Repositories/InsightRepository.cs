@@ -1,3 +1,4 @@
+using AdsManager.Application.DTOs.Common;
 using AdsManager.Application.DTOs.Insights;
 using AdsManager.Application.Interfaces;
 using AdsManager.Application.Interfaces.Repositories;
@@ -21,6 +22,33 @@ public sealed class InsightRepository : IInsightRepository
             .Where(x => x.TenantId == tenantId && x.Date >= from && x.Date <= to)
             .OrderByDescending(x => x.Date)
             .ToListAsync(cancellationToken);
+
+    public async Task<(IReadOnlyCollection<InsightDaily> Items, int Total)> GetPagedAsync(Guid tenantId, InsightListRequest request, CancellationToken cancellationToken = default)
+    {
+        var query = _dbContext.InsightsDaily.AsNoTracking().Where(x => x.TenantId == tenantId);
+
+        if (request.DateFrom.HasValue)
+            query = query.Where(x => x.Date >= request.DateFrom.Value);
+
+        if (request.DateTo.HasValue)
+            query = query.Where(x => x.Date <= request.DateTo.Value);
+
+        if (request.CampaignId.HasValue)
+            query = query.Where(x => x.CampaignId == request.CampaignId.Value);
+
+        if (request.AdAccountId.HasValue)
+            query = query.Where(x => x.AdAccountId == request.AdAccountId.Value);
+
+        query = ApplySorting(query, request.SortBy, request.SortDirection);
+
+        var total = await query.CountAsync(cancellationToken);
+        var items = await query
+            .Skip((request.NormalizedPage - 1) * request.NormalizedPageSize)
+            .Take(request.NormalizedPageSize)
+            .ToListAsync(cancellationToken);
+
+        return (items, total);
+    }
 
     public async Task<DashboardTotalsDto> GetDashboardTotalsAsync(Guid tenantId, DashboardFilter filter, CancellationToken cancellationToken = default)
     {
@@ -84,5 +112,18 @@ public sealed class InsightRepository : IInsightRepository
             query = query.Where(x => x.AdAccountId == filter.AdAccountId.Value);
 
         return query;
+    }
+
+    private static IQueryable<InsightDaily> ApplySorting(IQueryable<InsightDaily> query, string? sortBy, SortDirection sortDirection)
+    {
+        var desc = sortDirection == SortDirection.Desc;
+
+        return sortBy?.ToLowerInvariant() switch
+        {
+            "spend" => desc ? query.OrderByDescending(x => x.Spend) : query.OrderBy(x => x.Spend),
+            "clicks" => desc ? query.OrderByDescending(x => x.Clicks) : query.OrderBy(x => x.Clicks),
+            "impressions" => desc ? query.OrderByDescending(x => x.Impressions) : query.OrderBy(x => x.Impressions),
+            _ => desc ? query.OrderByDescending(x => x.Date) : query.OrderBy(x => x.Date)
+        };
     }
 }

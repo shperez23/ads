@@ -25,12 +25,12 @@ public sealed class AdSetsController : ControllerBase
 
     [HttpGet]
     [Authorize(Policy = AuthorizationPolicies.AdSetsRead)]
-    public async Task<IActionResult> GetAdSets(CancellationToken cancellationToken)
+    public async Task<IActionResult> GetAdSets([FromQuery] AdSetListRequest request, CancellationToken cancellationToken)
     {
         if (!_tenantProvider.GetTenantId().HasValue)
             return Unauthorized();
 
-        var result = await _adSetService.GetAdSetsAsync(cancellationToken);
+        var result = await _adSetService.GetAdSetsAsync(request, cancellationToken);
         return Ok(result);
     }
 
