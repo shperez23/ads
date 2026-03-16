@@ -12,4 +12,20 @@ public sealed record MetaAdSetStatusUpdateRequest(string AdSetId, string Status)
 public sealed record MetaAdCreateRequest(string Name, string AdSetId, string Status, string CreativeJson);
 public sealed record MetaAdUpdateRequest(string AdId, string Name, string Status, string CreativeJson);
 public sealed record MetaAdStatusUpdateRequest(string AdId, string Status);
-public sealed record MetaInsightDto(string DateStart, string DateStop, string CampaignId, string CampaignName, string Spend, string Impressions, string Clicks, string Ctr);
+public sealed record MetaInsightDto(
+    string DateStart,
+    string DateStop,
+    string CampaignId,
+    string CampaignName,
+    string AdSetId,
+    string AdSetName,
+    string AdId,
+    string AdName,
+    string Spend,
+    string Impressions,
+    string Reach,
+    string Clicks,
+    string LinkClicks,
+    string Ctr,
+    string Cpc,
+    string Cpm);
