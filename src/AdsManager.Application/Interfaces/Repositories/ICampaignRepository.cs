@@ -1,3 +1,4 @@
+using AdsManager.Application.DTOs.Campaigns;
 using AdsManager.Domain.Entities;
 
 namespace AdsManager.Application.Interfaces.Repositories;
@@ -5,6 +6,7 @@ namespace AdsManager.Application.Interfaces.Repositories;
 public interface ICampaignRepository
 {
     Task<IReadOnlyCollection<Campaign>> GetByTenantAsync(Guid tenantId, CancellationToken cancellationToken = default);
+    Task<(IReadOnlyCollection<Campaign> Items, int Total)> GetPagedByTenantAsync(Guid tenantId, CampaignListRequest request, CancellationToken cancellationToken = default);
     Task<Campaign?> GetByIdAsync(Guid tenantId, Guid campaignId, CancellationToken cancellationToken = default);
     Task<Campaign?> GetByMetaCampaignIdAsync(Guid tenantId, string metaCampaignId, CancellationToken cancellationToken = default);
     Task AddAsync(Campaign campaign, CancellationToken cancellationToken = default);

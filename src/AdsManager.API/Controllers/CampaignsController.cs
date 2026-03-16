@@ -25,12 +25,12 @@ public sealed class CampaignsController : ControllerBase
 
     [HttpGet]
     [Authorize(Policy = AuthorizationPolicies.CampaignsRead)]
-    public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
+    public async Task<IActionResult> GetAll([FromQuery] CampaignListRequest request, CancellationToken cancellationToken)
     {
         if (!_tenantProvider.GetTenantId().HasValue)
             return Unauthorized();
 
-        var result = await _campaignService.GetAllAsync(cancellationToken);
+        var result = await _campaignService.GetAllAsync(request, cancellationToken);
         return Ok(result);
     }
 

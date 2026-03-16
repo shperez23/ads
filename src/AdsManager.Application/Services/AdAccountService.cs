@@ -1,5 +1,6 @@
 using AdsManager.Application.Common;
 using AdsManager.Application.DTOs.AdAccounts;
+using AdsManager.Application.DTOs.Common;
 using AdsManager.Application.Interfaces;
 using AdsManager.Application.Interfaces.Meta;
 using AdsManager.Application.Interfaces.Repositories;
@@ -26,13 +27,17 @@ public sealed class AdAccountService : IAdAccountService
         _auditService = auditService;
     }
 
-    public async Task<Result<IReadOnlyCollection<AdAccountDto>>> GetAllAsync(CancellationToken cancellationToken = default)
+    public async Task<Result<PagedResponse<AdAccountDto>>> GetAllAsync(AdAccountListRequest request, CancellationToken cancellationToken = default)
     {
         if (!TryGetTenantId(out var tenantId))
-            return Result<IReadOnlyCollection<AdAccountDto>>.Fail("Tenant no resuelto");
+            return Result<PagedResponse<AdAccountDto>>.Fail("Tenant no resuelto");
 
-        var accounts = await _adAccountRepository.GetByTenantAsync(tenantId, cancellationToken);
-        return Result<IReadOnlyCollection<AdAccountDto>>.Ok(accounts.Select(Map).ToArray());
+        var (items, total) = await _adAccountRepository.GetPagedByTenantAsync(tenantId, request, cancellationToken);
+        var page = request.NormalizedPage;
+        var pageSize = request.NormalizedPageSize;
+        var totalPages = (int)Math.Ceiling(total / (double)pageSize);
+
+        return Result<PagedResponse<AdAccountDto>>.Ok(new PagedResponse<AdAccountDto>(items.Select(Map).ToArray(), page, pageSize, total, totalPages));
     }
 
     public async Task<Result<IReadOnlyCollection<AdAccountDto>>> ImportFromMetaAsync(CancellationToken cancellationToken = default)

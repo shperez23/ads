@@ -23,12 +23,12 @@ public sealed class RulesController : ControllerBase
 
     [HttpGet]
     [Authorize(Policy = AuthorizationPolicies.RulesRead)]
-    public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
+    public async Task<IActionResult> GetAll([FromQuery] RuleListRequest request, CancellationToken cancellationToken)
     {
         if (!_tenantProvider.GetTenantId().HasValue)
             return Unauthorized();
 
-        var result = await _ruleService.GetAllAsync(cancellationToken);
+        var result = await _ruleService.GetAllAsync(request, cancellationToken);
         return Ok(result);
     }
 
