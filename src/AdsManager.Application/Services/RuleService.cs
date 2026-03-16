@@ -1,4 +1,5 @@
 using AdsManager.Application.Common;
+using AdsManager.Application.DTOs.Common;
 using AdsManager.Application.DTOs.Rules;
 using AdsManager.Application.Interfaces;
 using AdsManager.Application.Interfaces.Repositories;
@@ -18,13 +19,17 @@ public sealed class RuleService : IRuleService
         _tenantProvider = tenantProvider;
     }
 
-    public async Task<Result<IReadOnlyCollection<RuleDto>>> GetAllAsync(CancellationToken cancellationToken = default)
+    public async Task<Result<PagedResponse<RuleDto>>> GetAllAsync(RuleListRequest request, CancellationToken cancellationToken = default)
     {
         if (!TryGetTenantId(out var tenantId))
-            return Result<IReadOnlyCollection<RuleDto>>.Fail("Tenant no resuelto");
+            return Result<PagedResponse<RuleDto>>.Fail("Tenant no resuelto");
 
-        var rules = await _ruleRepository.GetByTenantAsync(tenantId, cancellationToken);
-        return Result<IReadOnlyCollection<RuleDto>>.Ok(rules.Select(Map).ToArray());
+        var (items, total) = await _ruleRepository.GetPagedByTenantAsync(tenantId, request, cancellationToken);
+        var page = request.NormalizedPage;
+        var pageSize = request.NormalizedPageSize;
+        var totalPages = (int)Math.Ceiling(total / (double)pageSize);
+
+        return Result<PagedResponse<RuleDto>>.Ok(new PagedResponse<RuleDto>(items.Select(Map).ToArray(), page, pageSize, total, totalPages));
     }
 
     public async Task<Result<RuleDto>> CreateAsync(CreateRuleRequest request, CancellationToken cancellationToken = default)

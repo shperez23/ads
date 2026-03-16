@@ -25,12 +25,12 @@ public sealed class ReportsController : ControllerBase
 
     [HttpGet("insights")]
     [Authorize(Policy = AuthorizationPolicies.ReportsRead)]
-    public async Task<IActionResult> GetInsights([FromQuery] DateOnly? dateFrom, [FromQuery] DateOnly? dateTo, [FromQuery] Guid? campaignId, [FromQuery] Guid? adAccountId, CancellationToken cancellationToken)
+    public async Task<IActionResult> GetInsights([FromQuery] InsightListRequest request, CancellationToken cancellationToken)
     {
         if (!_tenantProvider.GetTenantId().HasValue)
             return Unauthorized();
 
-        var result = await _reportService.GetInsightsAsync(new DashboardFilter(dateFrom, dateTo, campaignId, adAccountId), cancellationToken);
+        var result = await _reportService.GetInsightsAsync(request, cancellationToken);
         return Ok(result);
     }
 

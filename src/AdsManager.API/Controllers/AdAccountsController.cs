@@ -22,12 +22,12 @@ public sealed class AdAccountsController : ControllerBase
 
     [HttpGet]
     [Authorize(Policy = AuthorizationPolicies.AdAccountsManage)]
-    public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
+    public async Task<IActionResult> GetAll([FromQuery] AdAccountListRequest request, CancellationToken cancellationToken)
     {
         if (!_tenantProvider.GetTenantId().HasValue)
             return Unauthorized();
 
-        var result = await _adAccountService.GetAllAsync(cancellationToken);
+        var result = await _adAccountService.GetAllAsync(request, cancellationToken);
         return Ok(result);
     }
 
