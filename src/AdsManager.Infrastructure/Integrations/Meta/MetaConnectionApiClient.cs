@@ -58,4 +58,59 @@ public sealed class MetaConnectionApiClient : IMetaConnectionApiClient
 
         return (isValid, permissions);
     }
+
+    public async Task<MetaTokenRefreshApiResult> TryRefreshTokenAsync(string appId, string appSecret, string accessToken, CancellationToken cancellationToken = default)
+    {
+        var endpoint = $"oauth/access_token?grant_type=fb_exchange_token&client_id={Uri.EscapeDataString(appId)}&client_secret={Uri.EscapeDataString(appSecret)}&fb_exchange_token={Uri.EscapeDataString(accessToken)}";
+
+        using var response = await _httpClient.GetAsync(endpoint, cancellationToken);
+        var responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            return new MetaTokenRefreshApiResult(
+                Success: false,
+                IsSupported: true,
+                AccessToken: null,
+                ExpiresAtUtc: null,
+                Message: "Meta token refresh failed.",
+                StatusCode: (int)response.StatusCode,
+                ResponsePayload: string.IsNullOrWhiteSpace(responseJson) ? "{}" : responseJson);
+        }
+
+        using var doc = JsonDocument.Parse(responseJson);
+        var refreshedToken = doc.RootElement.TryGetProperty("access_token", out var tokenElement)
+            ? tokenElement.GetString()
+            : null;
+
+        if (string.IsNullOrWhiteSpace(refreshedToken))
+        {
+            return new MetaTokenRefreshApiResult(
+                Success: false,
+                IsSupported: true,
+                AccessToken: null,
+                ExpiresAtUtc: null,
+                Message: "Meta did not return an access token.",
+                StatusCode: (int)response.StatusCode,
+                ResponsePayload: responseJson);
+        }
+
+        DateTime? expiresAt = null;
+        if (doc.RootElement.TryGetProperty("expires_in", out var expiresInElement)
+            && expiresInElement.ValueKind == JsonValueKind.Number
+            && expiresInElement.TryGetInt64(out var expiresInSeconds)
+            && expiresInSeconds > 0)
+        {
+            expiresAt = DateTime.UtcNow.AddSeconds(expiresInSeconds);
+        }
+
+        return new MetaTokenRefreshApiResult(
+            Success: true,
+            IsSupported: true,
+            AccessToken: refreshedToken,
+            ExpiresAtUtc: expiresAt,
+            Message: "Meta token refreshed successfully.",
+            StatusCode: (int)response.StatusCode,
+            ResponsePayload: responseJson);
+    }
 }

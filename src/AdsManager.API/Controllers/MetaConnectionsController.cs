@@ -60,6 +60,17 @@ public sealed class MetaConnectionsController : ControllerBase
         return result.Success ? Ok(result) : NotFound(result);
     }
 
+
+    [HttpPost("{id:guid}/refresh-token")]
+    public async Task<IActionResult> RefreshToken([FromRoute] Guid id, CancellationToken cancellationToken)
+    {
+        if (!_tenantProvider.GetTenantId().HasValue)
+            return Unauthorized();
+
+        var result = await _metaConnectionService.RefreshTokenAsync(id, cancellationToken);
+        return result.Success ? Ok(result) : NotFound(result);
+    }
+
     [HttpPost("{id:guid}/validate")]
     public async Task<IActionResult> ValidateConnection([FromRoute] Guid id, CancellationToken cancellationToken)
     {

@@ -14,4 +14,12 @@ public sealed class MetaConnection : AuditableEntity, ITenantScoped
     public DateTime TokenExpiration { get; set; }
     public string BusinessId { get; set; } = string.Empty;
     public ConnectionStatus Status { get; set; } = ConnectionStatus.Connected;
+    public DateTime? LastHealthCheckAt { get; set; }
+    public string? LastHealthCheckStatus { get; set; }
+    public string? LastHealthCheckDetails { get; set; }
+
+    public bool IsTokenExpiringSoon(TimeSpan threshold)
+    {
+        return TokenExpiration <= DateTime.UtcNow.Add(threshold);
+    }
 }

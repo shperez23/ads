@@ -27,6 +27,11 @@ public static class HangfireRecurringJobsExtensions
             job => job.ExecuteAsync(null, null, default),
             Cron.Daily);
 
+        RecurringJob.AddOrUpdate<RefreshMetaTokenJob>(
+            "refresh-meta-tokens-hourly",
+            job => job.ExecuteAsync(7, default),
+            "0 * * * *");
+
         return app;
     }
 }

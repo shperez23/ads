@@ -52,6 +52,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<SyncAdSetsJob>();
         services.AddScoped<SyncAdsJob>();
         services.AddScoped<SyncInsightsJob>();
+        services.AddScoped<RefreshMetaTokenJob>();
 
         services.AddHangfire(config => config
          .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)

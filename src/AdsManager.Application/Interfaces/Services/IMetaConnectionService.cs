@@ -10,4 +10,5 @@ public interface IMetaConnectionService
     Task<Result<MetaConnectionDto>> UpdateConnectionAsync(Guid connectionId, UpdateMetaConnectionRequest request, CancellationToken cancellationToken = default);
     Task<Result<bool>> DeleteConnectionAsync(Guid connectionId, CancellationToken cancellationToken = default);
     Task<Result<MetaConnectionValidationResultDto>> ValidateConnectionAsync(Guid connectionId, CancellationToken cancellationToken = default);
+    Task<Result<MetaConnectionTokenRefreshResultDto>> RefreshTokenAsync(Guid connectionId, CancellationToken cancellationToken = default);
 }

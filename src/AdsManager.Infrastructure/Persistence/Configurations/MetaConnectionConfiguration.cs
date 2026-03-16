@@ -15,6 +15,8 @@ public sealed class MetaConnectionConfiguration : IEntityTypeConfiguration<MetaC
         builder.Property(x => x.AppSecret).HasMaxLength(500).IsRequired();
         builder.Property(x => x.AccessToken).HasMaxLength(4000).IsRequired();
         builder.Property(x => x.BusinessId).HasMaxLength(100).IsRequired();
+        builder.Property(x => x.LastHealthCheckStatus).HasMaxLength(60);
+        builder.Property(x => x.LastHealthCheckDetails).HasColumnType("text");
 
         builder.HasIndex(x => x.TenantId);
     }
