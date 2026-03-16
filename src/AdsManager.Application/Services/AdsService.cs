@@ -139,7 +139,8 @@ public sealed class AdsService : IAdsService
             Action = action,
             EntityName = entityName,
             EntityId = entityId,
-            PayloadJson = JsonSerializer.Serialize(payload)
+            PayloadJson = JsonSerializer.Serialize(payload),
+            TraceId = _tenantProvider.GetTraceId()
         });
 
         await _dbContext.SaveChangesAsync(cancellationToken);

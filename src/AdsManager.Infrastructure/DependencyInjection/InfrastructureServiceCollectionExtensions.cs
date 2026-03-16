@@ -3,6 +3,7 @@ using AdsManager.Application.Interfaces.Meta;
 using AdsManager.Application.Interfaces.Repositories;
 using AdsManager.Infrastructure.Background;
 using AdsManager.Infrastructure.Integrations.Meta;
+using AdsManager.Infrastructure.Observability;
 using AdsManager.Infrastructure.Persistence;
 using AdsManager.Infrastructure.Persistence.Repositories;
 using AdsManager.Infrastructure.Security;
@@ -34,6 +35,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddDataProtection();
         services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
         services.AddScoped<ISecretEncryptionService, SecretEncryptionService>();
+        services.AddSingleton<IObservabilityMetrics, ObservabilityMetrics>();
 
         services.AddHttpClient<IMetaAdsService, MetaAdsService>();
         services.AddHttpClient<IMetaConnectionApiClient, MetaConnectionApiClient>();

@@ -24,4 +24,7 @@ public sealed class TenantProvider : ITenantProvider
         var userClaim = user?.FindFirstValue(ClaimTypes.NameIdentifier) ?? user?.FindFirstValue("sub");
         return Guid.TryParse(userClaim, out var userId) ? userId : null;
     }
+
+    public string GetTraceId()
+        => _httpContextAccessor.HttpContext?.TraceIdentifier ?? string.Empty;
 }

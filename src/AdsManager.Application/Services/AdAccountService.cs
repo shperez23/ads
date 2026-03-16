@@ -73,7 +73,8 @@ public sealed class AdAccountService : IAdAccountService
             Action = "import adaccounts",
             EntityName = nameof(AdAccount),
             EntityId = string.Empty,
-            PayloadJson = JsonSerializer.Serialize(metaAccounts)
+            PayloadJson = JsonSerializer.Serialize(metaAccounts),
+            TraceId = _tenantProvider.GetTraceId()
         });
         await _dbContext.SaveChangesAsync(cancellationToken);
 

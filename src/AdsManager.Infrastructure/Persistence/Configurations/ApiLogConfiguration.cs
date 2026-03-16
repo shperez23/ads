@@ -18,6 +18,7 @@ public sealed class ApiLogConfiguration : IEntityTypeConfiguration<ApiLog>
         builder.Property(x => x.ResponseJson).HasColumnType("text").IsRequired();
         builder.Property(x => x.Status).HasMaxLength(40).IsRequired();
         builder.Property(x => x.DurationMs).IsRequired();
+        builder.Property(x => x.TraceId).HasMaxLength(100).IsRequired();
 
         builder.HasIndex(x => new { x.Provider, x.CreatedAt });
     }

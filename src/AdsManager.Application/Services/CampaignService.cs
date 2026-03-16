@@ -17,13 +17,15 @@ public sealed class CampaignService : ICampaignService
     private readonly IApplicationDbContext _dbContext;
     private readonly IMetaAdsService _metaAdsService;
     private readonly ITenantProvider _tenantProvider;
+    private readonly IObservabilityMetrics _observabilityMetrics;
 
-    public CampaignService(ICampaignRepository campaignRepository, IApplicationDbContext dbContext, IMetaAdsService metaAdsService, ITenantProvider tenantProvider)
+    public CampaignService(ICampaignRepository campaignRepository, IApplicationDbContext dbContext, IMetaAdsService metaAdsService, ITenantProvider tenantProvider, IObservabilityMetrics observabilityMetrics)
     {
         _campaignRepository = campaignRepository;
         _dbContext = dbContext;
         _metaAdsService = metaAdsService;
         _tenantProvider = tenantProvider;
+        _observabilityMetrics = observabilityMetrics;
     }
 
     public async Task<Result<IReadOnlyCollection<CampaignDto>>> GetAllAsync(CancellationToken cancellationToken = default)
@@ -76,6 +78,7 @@ public sealed class CampaignService : ICampaignService
 
         await _campaignRepository.AddAsync(campaign, cancellationToken);
         await WriteAuditLogAsync(tenantId, _tenantProvider.GetUserId(), "create campaign", nameof(Campaign), campaign.Id.ToString(), campaign, cancellationToken);
+        _observabilityMetrics.IncrementCampaignCreation();
         return Result<CampaignDto>.Ok(Map(campaign), "Campaña creada correctamente");
     }
 
@@ -153,7 +156,8 @@ public sealed class CampaignService : ICampaignService
             Action = action,
             EntityName = entityName,
             EntityId = entityId,
-            PayloadJson = JsonSerializer.Serialize(payload)
+            PayloadJson = JsonSerializer.Serialize(payload),
+            TraceId = _tenantProvider.GetTraceId()
         });
 
         await _dbContext.SaveChangesAsync(cancellationToken);
