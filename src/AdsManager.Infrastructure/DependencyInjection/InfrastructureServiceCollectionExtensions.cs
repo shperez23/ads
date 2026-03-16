@@ -5,6 +5,7 @@ using AdsManager.Application.Interfaces.Repositories;
 using AdsManager.Application.Interfaces.Services;
 using AdsManager.Application.Services;
 using AdsManager.Infrastructure.Background;
+using AdsManager.Infrastructure.Background.Retention;
 using AdsManager.Infrastructure.Caching;
 using AdsManager.Infrastructure.Integrations.Meta;
 using AdsManager.Infrastructure.Observability;
@@ -28,6 +29,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
         services.Configure<CacheOptions>(configuration.GetSection(CacheOptions.SectionName));
         services.Configure<AuthProtectionOptions>(configuration.GetSection(AuthProtectionOptions.SectionName));
+        services.Configure<DataRetentionOptions>(configuration.GetSection(DataRetentionOptions.SectionName));
 
         var connectionString = Environment.GetEnvironmentVariable("ADSMANAGER_DB_CONNECTION")
             ?? configuration.GetConnectionString("DefaultConnection")
@@ -68,6 +70,12 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<SyncInsightsJob>();
         services.AddScoped<RefreshMetaTokenJob>();
         services.AddScoped<RuleEvaluationJob>();
+        services.AddScoped<CleanupApiLogsJob>();
+        services.AddScoped<CleanupAuditLogsJob>();
+        services.AddScoped<CleanupSyncJobRunsJob>();
+        services.AddScoped<CleanupRuleExecutionLogsJob>();
+        services.AddScoped<IDataRetentionCleanupService, DataRetentionCleanupService>();
+        services.AddScoped<IInsightDailyRetentionService, InsightDailyRetentionService>();
 
         services.AddHangfire(config => config
          .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)

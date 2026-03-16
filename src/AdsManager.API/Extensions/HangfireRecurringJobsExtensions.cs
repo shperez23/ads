@@ -37,6 +37,26 @@ public static class HangfireRecurringJobsExtensions
             job => job.ExecuteAsync(default),
             "5 * * * *");
 
+        RecurringJob.AddOrUpdate<CleanupApiLogsJob>(
+            "cleanup-api-logs-daily",
+            job => job.ExecuteAsync(default),
+            "20 2 * * *");
+
+        RecurringJob.AddOrUpdate<CleanupAuditLogsJob>(
+            "cleanup-audit-logs-daily",
+            job => job.ExecuteAsync(default),
+            "30 2 * * *");
+
+        RecurringJob.AddOrUpdate<CleanupRuleExecutionLogsJob>(
+            "cleanup-rule-execution-logs-daily",
+            job => job.ExecuteAsync(default),
+            "40 2 * * *");
+
+        RecurringJob.AddOrUpdate<CleanupSyncJobRunsJob>(
+            "cleanup-sync-job-runs-daily",
+            job => job.ExecuteAsync(default),
+            "50 2 * * *");
+
         return app;
     }
 }
