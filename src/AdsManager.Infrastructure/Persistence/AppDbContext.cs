@@ -36,6 +36,8 @@ public abstract class AppDbContext<TContext> : DbContext, IApplicationDbContext
     public DbSet<SyncJobRun> SyncJobRuns => Set<SyncJobRun>();
     public DbSet<Rule> Rules => Set<Rule>();
     public DbSet<RuleExecutionLog> RuleExecutionLogs => Set<RuleExecutionLog>();
+    public DbSet<AuthAttemptLog> AuthAttemptLogs => Set<AuthAttemptLog>();
+    public DbSet<AuthLockoutState> AuthLockoutStates => Set<AuthLockoutState>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

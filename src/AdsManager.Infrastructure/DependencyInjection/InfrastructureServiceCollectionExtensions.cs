@@ -2,6 +2,8 @@ using AdsManager.Application.Configuration;
 using AdsManager.Application.Interfaces;
 using AdsManager.Application.Interfaces.Meta;
 using AdsManager.Application.Interfaces.Repositories;
+using AdsManager.Application.Interfaces.Services;
+using AdsManager.Application.Services;
 using AdsManager.Infrastructure.Background;
 using AdsManager.Infrastructure.Caching;
 using AdsManager.Infrastructure.Integrations.Meta;
@@ -23,6 +25,7 @@ public static class InfrastructureServiceCollectionExtensions
     {
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
         services.Configure<CacheOptions>(configuration.GetSection(CacheOptions.SectionName));
+        services.Configure<AuthProtectionOptions>(configuration.GetSection(AuthProtectionOptions.SectionName));
 
         var connectionString = Environment.GetEnvironmentVariable("ADSMANAGER_DB_CONNECTION")
             ?? configuration.GetConnectionString("DefaultConnection")
@@ -39,6 +42,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddDataProtection();
         services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
         services.AddScoped<ISecretEncryptionService, SecretEncryptionService>();
+        services.AddScoped<IAuthProtectionService, AuthProtectionService>();
         services.AddMemoryCache();
         // Initial implementation is in-memory; abstraction left ready for Redis-backed implementation.
         services.AddSingleton<ICacheService, MemoryCacheService>();

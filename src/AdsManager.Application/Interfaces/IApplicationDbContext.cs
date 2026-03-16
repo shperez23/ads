@@ -22,6 +22,8 @@ public interface IApplicationDbContext
     DbSet<SyncJobRun> SyncJobRuns { get; }
     DbSet<Rule> Rules { get; }
     DbSet<RuleExecutionLog> RuleExecutionLogs { get; }
+    DbSet<AuthAttemptLog> AuthAttemptLogs { get; }
+    DbSet<AuthLockoutState> AuthLockoutStates { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
