@@ -47,7 +47,10 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IInsightRepository, InsightRepository>();
         services.AddScoped<IMetaConnectionRepository, MetaConnectionRepository>();
 
+        services.AddScoped<SyncOrchestratorService>();
         services.AddScoped<SyncCampaignsJob>();
+        services.AddScoped<SyncAdSetsJob>();
+        services.AddScoped<SyncAdsJob>();
         services.AddScoped<SyncInsightsJob>();
 
         services.AddHangfire(config => config

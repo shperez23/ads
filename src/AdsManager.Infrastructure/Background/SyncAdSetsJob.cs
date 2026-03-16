@@ -2,12 +2,12 @@ using AdsManager.Application.Interfaces.Meta;
 
 namespace AdsManager.Infrastructure.Background;
 
-public sealed class SyncInsightsJob
+public sealed class SyncAdSetsJob
 {
     private readonly SyncOrchestratorService _syncOrchestratorService;
     private readonly IMetaAdsService _metaAdsService;
 
-    public SyncInsightsJob(SyncOrchestratorService syncOrchestratorService, IMetaAdsService metaAdsService)
+    public SyncAdSetsJob(SyncOrchestratorService syncOrchestratorService, IMetaAdsService metaAdsService)
     {
         _syncOrchestratorService = syncOrchestratorService;
         _metaAdsService = metaAdsService;
@@ -15,11 +15,9 @@ public sealed class SyncInsightsJob
 
     public Task ExecuteAsync(Guid? tenantId = null, string? adAccountId = null, CancellationToken cancellationToken = default)
     {
-        var yesterday = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1));
-
         return _syncOrchestratorService.ExecutePerAccountAsync(
-            jobName: nameof(SyncInsightsJob),
-            executePerAccount: (tenant, account, ct) => _metaAdsService.SyncInsightsAsync(tenant, account, yesterday, yesterday, ct),
+            jobName: nameof(SyncAdSetsJob),
+            executePerAccount: (tenant, account, ct) => _metaAdsService.SyncAdSetsAsync(tenant, account, ct),
             tenantId: tenantId,
             adAccountId: adAccountId,
             cancellationToken: cancellationToken);

@@ -4,6 +4,7 @@ using AdsManager.Application.Interfaces;
 using AdsManager.Application.Interfaces.Services;
 using AdsManager.API.Middleware;
 using AdsManager.API.Services;
+using AdsManager.API.Extensions;
 using AdsManager.Application.Mappings;
 using AdsManager.Application.Services;
 using AdsManager.Application.Validators.Auth;
@@ -136,8 +137,7 @@ app.UseHangfireDashboard("/hangfire", new DashboardOptions
 {
     Authorization = [new HangfireAdminAuthorizationFilter()]
 });
-RecurringJob.AddOrUpdate<SyncCampaignsJob>("sync-campaigns-6-hours", job => job.ExecuteAsync(default), "0 */6 * * *");
-RecurringJob.AddOrUpdate<SyncInsightsJob>("sync-insights-24-hours", job => job.ExecuteAsync(default), Cron.Daily);
+app.RegisterRecurringSyncJobs();
 
 app.MapControllers();
 
