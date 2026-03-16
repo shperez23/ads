@@ -7,6 +7,7 @@ using AdsManager.Infrastructure.Background;
 using AdsManager.Infrastructure.DependencyInjection;
 using AdsManager.Infrastructure.Persistence;
 using AdsManager.Infrastructure.Security;
+using FluentValidation;
 using FluentValidation.AspNetCore;
 using Hangfire;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
