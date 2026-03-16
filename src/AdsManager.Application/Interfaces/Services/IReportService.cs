@@ -5,5 +5,5 @@ namespace AdsManager.Application.Interfaces.Services;
 
 public interface IReportService
 {
-    Task<Result<IReadOnlyCollection<InsightDto>>> GetInsightsAsync(Guid tenantId, DashboardFilter filter, CancellationToken cancellationToken = default);
+    Task<Result<IReadOnlyCollection<InsightDto>>> GetInsightsAsync(DashboardFilter filter, CancellationToken cancellationToken = default);
 }

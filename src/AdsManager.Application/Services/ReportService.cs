@@ -9,15 +9,20 @@ namespace AdsManager.Application.Services;
 public sealed class ReportService : IReportService
 {
     private readonly IApplicationDbContext _dbContext;
+    private readonly ITenantProvider _tenantProvider;
 
-    public ReportService(IApplicationDbContext dbContext)
+    public ReportService(IApplicationDbContext dbContext, ITenantProvider tenantProvider)
     {
         _dbContext = dbContext;
+        _tenantProvider = tenantProvider;
     }
 
-    public async Task<Result<IReadOnlyCollection<InsightDto>>> GetInsightsAsync(Guid tenantId, DashboardFilter filter, CancellationToken cancellationToken = default)
+    public async Task<Result<IReadOnlyCollection<InsightDto>>> GetInsightsAsync(DashboardFilter filter, CancellationToken cancellationToken = default)
     {
-        var query = _dbContext.InsightsDaily.AsNoTracking().Where(x => x.TenantId == tenantId);
+        if (!_tenantProvider.GetTenantId().HasValue)
+            return Result<IReadOnlyCollection<InsightDto>>.Fail("Tenant no resuelto");
+
+        var query = _dbContext.InsightsDaily.AsNoTracking();
 
         if (filter.DateFrom.HasValue)
             query = query.Where(x => x.Date >= filter.DateFrom.Value);
