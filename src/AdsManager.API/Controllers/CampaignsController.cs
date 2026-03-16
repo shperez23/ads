@@ -13,10 +13,12 @@ public sealed class CampaignsController : ControllerBase
 {
     private readonly ICampaignService _campaignService;
     private readonly ITenantProvider _tenantProvider;
+    private readonly IReportService _reportService;
 
-    public CampaignsController(ICampaignService campaignService, ITenantProvider tenantProvider)
+    public CampaignsController(ICampaignService campaignService, IReportService reportService, ITenantProvider tenantProvider)
     {
         _campaignService = campaignService;
+        _reportService = reportService;
         _tenantProvider = tenantProvider;
     }
 
@@ -37,6 +39,16 @@ public sealed class CampaignsController : ControllerBase
             return Unauthorized();
 
         var result = await _campaignService.GetByIdAsync(id, cancellationToken);
+        return result.Success ? Ok(result) : NotFound(result);
+    }
+
+    [HttpGet("{id:guid}/insights")]
+    public async Task<IActionResult> GetInsightsByCampaign([FromRoute] Guid id, [FromQuery] DateOnly? dateFrom, [FromQuery] DateOnly? dateTo, CancellationToken cancellationToken)
+    {
+        if (!_tenantProvider.GetTenantId().HasValue)
+            return Unauthorized();
+
+        var result = await _reportService.GetCampaignInsightsAsync(id, dateFrom, dateTo, cancellationToken);
         return result.Success ? Ok(result) : NotFound(result);
     }
 
