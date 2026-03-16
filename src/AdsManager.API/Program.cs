@@ -47,6 +47,7 @@ builder.Services.AddScoped<IRuleService, RuleService>();
 builder.Services.AddAutoMapper(cfg => cfg.AddProfile<AuthMappingProfile>());
 builder.Services.AddValidatorsFromAssemblyContaining<RegisterRequestValidator>();
 builder.Services.AddFluentValidationAutoValidation();
+builder.Services.AddConfiguredHealthChecks();
 
 var authProtection = builder.Configuration.GetSection(AuthProtectionOptions.SectionName).Get<AuthProtectionOptions>() ?? new AuthProtectionOptions();
 
@@ -190,5 +191,6 @@ app.UseConfiguredHangfireDashboard();
 app.RegisterRecurringSyncJobs();
 
 app.MapControllers();
+app.MapConfiguredHealthChecks(app.Configuration);
 
 app.Run();
