@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text;
 using AdsManager.Application.Interfaces;
 using AdsManager.Application.Interfaces.Services;
@@ -47,7 +48,15 @@ jwt.SecretKey = Environment.GetEnvironmentVariable("ADSMANAGER_JWT_SECRET") ?? j
 
 if (string.IsNullOrWhiteSpace(jwt.SecretKey))
 {
-    throw new InvalidOperationException("JWT secret key is not configured. Set ADSMANAGER_JWT_SECRET or Jwt:SecretKey in configuration.");
+    if (builder.Environment.IsDevelopment())
+    {
+        jwt.SecretKey = Convert.ToBase64String(RandomNumberGenerator.GetBytes(48));
+        Log.Warning("JWT secret key is not configured. Generated an ephemeral development key. Set ADSMANAGER_JWT_SECRET or Jwt:SecretKey to keep tokens stable across restarts.");
+    }
+    else
+    {
+        throw new InvalidOperationException("JWT secret key is not configured. Set ADSMANAGER_JWT_SECRET or Jwt:SecretKey in configuration.");
+    }
 }
 
 if (Encoding.UTF8.GetByteCount(jwt.SecretKey) < 32)
