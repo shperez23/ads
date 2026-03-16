@@ -3,6 +3,7 @@ using System.Security.Claims;
 using AdsManager.API.Middleware;
 using AdsManager.Application.Configuration;
 using Hangfire;
+using Asp.Versioning.ApiExplorer;
 using Hangfire.Dashboard;
 using Microsoft.AspNetCore.Authentication;
 
@@ -45,8 +46,17 @@ public static class ConfiguredOperationalSurfacesExtensions
             });
         }
 
+        var apiVersionDescriptionProvider = app.Services.GetRequiredService<IApiVersionDescriptionProvider>();
+
         app.UseSwagger();
-        app.UseSwaggerUI();
+        app.UseSwaggerUI(options =>
+        {
+            foreach (var description in apiVersionDescriptionProvider.ApiVersionDescriptions)
+            {
+                options.SwaggerEndpoint($"/swagger/{description.GroupName}/swagger.json", $"AdsManager API {description.GroupName.ToUpperInvariant()}");
+            }
+        });
+
         return app;
     }
 

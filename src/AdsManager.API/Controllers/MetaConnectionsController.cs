@@ -9,6 +9,8 @@ namespace AdsManager.API.Controllers;
 
 [ApiController]
 [Authorize]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/meta/connections")]
 [Route("api/meta/connections")]
 public sealed class MetaConnectionsController : ControllerBase
 {
