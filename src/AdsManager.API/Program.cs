@@ -50,8 +50,17 @@ builder.Services.AddAutoMapper(cfg => cfg.AddProfile<AuthMappingProfile>());
 builder.Services.AddValidatorsFromAssemblyContaining<RegisterRequestValidator>();
 builder.Services.AddFluentValidationAutoValidation();
 builder.Services.AddConfiguredHealthChecks();
+builder.Services.AddConfiguredCors(builder.Configuration);
 
 var authProtection = builder.Configuration.GetSection(AuthProtectionOptions.SectionName).Get<AuthProtectionOptions>() ?? new AuthProtectionOptions();
+var cors = builder.Configuration.GetSection(CorsOptions.SectionName).Get<CorsOptions>() ?? new CorsOptions();
+
+Log.Information(
+    "CORS policy loaded. Origins: {OriginsCount}, Methods: {MethodsCount}, Headers: {HeadersCount}, Credentials: {AllowCredentials}",
+    cors.AllowedOrigins.Length,
+    cors.AllowedMethods.Length,
+    cors.AllowedHeaders.Length,
+    cors.AllowCredentials);
 
 builder.Services.AddRateLimiter(options =>
 {
@@ -209,6 +218,7 @@ app.UseSerilogRequestLogging(options =>
     };
 });
 app.UseRateLimiter();
+app.UseConfiguredCors();
 app.UseAuthentication();
 app.UseMiddleware<TenantMiddleware>();
 app.UseAuthorization();
