@@ -17,14 +17,16 @@ public sealed class AdsService : IAdsService
     private readonly IMetaAdsService _metaAdsService;
     private readonly ITenantProvider _tenantProvider;
     private readonly IAuditService _auditService;
+    private readonly ICacheService _cacheService;
 
-    public AdsService(IAdSetRepository adSetRepository, IAdRepository adRepository, IMetaAdsService metaAdsService, ITenantProvider tenantProvider, IAuditService auditService)
+    public AdsService(IAdSetRepository adSetRepository, IAdRepository adRepository, IMetaAdsService metaAdsService, ITenantProvider tenantProvider, IAuditService auditService, ICacheService cacheService)
     {
         _adSetRepository = adSetRepository;
         _adRepository = adRepository;
         _metaAdsService = metaAdsService;
         _tenantProvider = tenantProvider;
         _auditService = auditService;
+        _cacheService = cacheService;
     }
 
     public async Task<Result<IReadOnlyCollection<AdDto>>> GetAdsAsync(CancellationToken cancellationToken = default)
@@ -73,6 +75,7 @@ public sealed class AdsService : IAdsService
         };
 
         await _adRepository.AddAsync(ad, cancellationToken);
+        await InvalidateInsightsCacheAsync(tenantId, cancellationToken);
         await _auditService.LogAsync(_tenantProvider.GetUserId(), tenantId, "create ad", nameof(Ad), ad.Id.ToString(), JsonSerializer.Serialize(ad), cancellationToken);
 
         return Result<AdDto>.Ok(Map(ad), "Ad creado correctamente");
@@ -95,6 +98,7 @@ public sealed class AdsService : IAdsService
         ad.PreviewUrl = request.PreviewUrl;
 
         await _adRepository.UpdateAsync(ad, cancellationToken);
+        await InvalidateInsightsCacheAsync(tenantId, cancellationToken);
         await _auditService.LogAsync(_tenantProvider.GetUserId(), tenantId, "update ad", nameof(Ad), ad.Id.ToString(), JsonSerializer.Serialize(request), cancellationToken);
 
         return Result<AdDto>.Ok(Map(ad), "Ad actualizado correctamente");
@@ -119,9 +123,16 @@ public sealed class AdsService : IAdsService
 
         ad.Status = status;
         await _adRepository.UpdateAsync(ad, cancellationToken);
+        await InvalidateInsightsCacheAsync(tenantId, cancellationToken);
         await _auditService.LogAsync(_tenantProvider.GetUserId(), tenantId, status == "PAUSED" ? "pause ad" : "activate ad", nameof(Ad), ad.Id.ToString(), JsonSerializer.Serialize(new { ad.Status }), cancellationToken);
 
         return Result<AdDto>.Ok(Map(ad), $"Estado actualizado a {status}");
+    }
+
+    private async Task InvalidateInsightsCacheAsync(Guid tenantId, CancellationToken cancellationToken)
+    {
+        foreach (var prefix in InsightsCacheKeys.TenantPrefixes(tenantId))
+            await _cacheService.RemoveByPrefixAsync(prefix, cancellationToken);
     }
 
     private bool TryGetTenantId(out Guid tenantId)

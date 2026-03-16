@@ -1,7 +1,9 @@
 using AdsManager.Application.Common;
+using AdsManager.Application.Configuration;
 using AdsManager.Application.DTOs.Insights;
 using AdsManager.Application.Interfaces;
 using AdsManager.Application.Interfaces.Services;
+using Microsoft.Extensions.Options;
 using Microsoft.EntityFrameworkCore;
 
 namespace AdsManager.Application.Services;
@@ -10,11 +12,15 @@ public sealed class ReportService : IReportService
 {
     private readonly IApplicationDbContext _dbContext;
     private readonly ITenantProvider _tenantProvider;
+    private readonly ICacheService _cacheService;
+    private readonly CacheOptions _cacheOptions;
 
-    public ReportService(IApplicationDbContext dbContext, ITenantProvider tenantProvider)
+    public ReportService(IApplicationDbContext dbContext, ITenantProvider tenantProvider, ICacheService cacheService, IOptions<CacheOptions> cacheOptions)
     {
         _dbContext = dbContext;
         _tenantProvider = tenantProvider;
+        _cacheService = cacheService;
+        _cacheOptions = cacheOptions.Value;
     }
 
     public async Task<Result<IReadOnlyCollection<InsightDto>>> GetInsightsAsync(DashboardFilter filter, CancellationToken cancellationToken = default)
@@ -22,16 +28,29 @@ public sealed class ReportService : IReportService
         if (!_tenantProvider.GetTenantId().HasValue)
             return Result<IReadOnlyCollection<InsightDto>>.Fail("Tenant no resuelto");
 
-        var query = BuildInsightsQuery(filter.DateFrom, filter.DateTo);
+        var tenantId = _tenantProvider.GetTenantId()!.Value;
+        var cacheKey = InsightsCacheKeys.Report(tenantId, filter.DateFrom, filter.DateTo, filter.CampaignId, filter.AdAccountId);
+        var ttl = TimeSpan.FromSeconds(Math.Max(1, _cacheOptions.ReportTtlSeconds));
 
-        if (filter.CampaignId.HasValue)
-            query = query.Where(x => x.CampaignId == filter.CampaignId.Value);
+        var insights = await _cacheService.GetOrCreateAsync(
+            cacheKey,
+            async ct =>
+            {
+                var query = BuildInsightsQuery(filter.DateFrom, filter.DateTo);
 
-        if (filter.AdAccountId.HasValue)
-            query = query.Where(x => x.AdAccountId == filter.AdAccountId.Value);
+                if (filter.CampaignId.HasValue)
+                    query = query.Where(x => x.CampaignId == filter.CampaignId.Value);
 
-        var insights = await query.OrderByDescending(x => x.Date).ToListAsync(cancellationToken);
-        return Result<IReadOnlyCollection<InsightDto>>.Ok(MapInsights(insights));
+                if (filter.AdAccountId.HasValue)
+                    query = query.Where(x => x.AdAccountId == filter.AdAccountId.Value);
+
+                var rows = await query.OrderByDescending(x => x.Date).ToListAsync(ct);
+                return MapInsights(rows);
+            },
+            ttl,
+            cancellationToken);
+
+        return Result<IReadOnlyCollection<InsightDto>>.Ok(insights);
     }
 
     public async Task<Result<IReadOnlyCollection<InsightDto>>> GetCampaignInsightsAsync(Guid campaignId, DateOnly? dateFrom, DateOnly? dateTo, CancellationToken cancellationToken = default)
