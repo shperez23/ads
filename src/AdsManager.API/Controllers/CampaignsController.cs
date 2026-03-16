@@ -3,6 +3,7 @@ using AdsManager.Application.Interfaces;
 using AdsManager.Application.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using AdsManager.API.Authorization;
 
 namespace AdsManager.API.Controllers;
 
@@ -23,6 +24,7 @@ public sealed class CampaignsController : ControllerBase
     }
 
     [HttpGet]
+    [Authorize(Policy = AuthorizationPolicies.CampaignsRead)]
     public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
     {
         if (!_tenantProvider.GetTenantId().HasValue)
@@ -33,6 +35,7 @@ public sealed class CampaignsController : ControllerBase
     }
 
     [HttpGet("{id:guid}")]
+    [Authorize(Policy = AuthorizationPolicies.CampaignsRead)]
     public async Task<IActionResult> GetById([FromRoute] Guid id, CancellationToken cancellationToken)
     {
         if (!_tenantProvider.GetTenantId().HasValue)
@@ -43,6 +46,7 @@ public sealed class CampaignsController : ControllerBase
     }
 
     [HttpGet("{id:guid}/insights")]
+    [Authorize(Policy = AuthorizationPolicies.ReportsRead)]
     public async Task<IActionResult> GetInsightsByCampaign([FromRoute] Guid id, [FromQuery] DateOnly? dateFrom, [FromQuery] DateOnly? dateTo, CancellationToken cancellationToken)
     {
         if (!_tenantProvider.GetTenantId().HasValue)
@@ -53,6 +57,7 @@ public sealed class CampaignsController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Policy = AuthorizationPolicies.CampaignsWrite)]
     public async Task<IActionResult> Create([FromBody] CreateCampaignRequest request, CancellationToken cancellationToken)
     {
         if (!_tenantProvider.GetTenantId().HasValue)
@@ -63,6 +68,7 @@ public sealed class CampaignsController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
+    [Authorize(Policy = AuthorizationPolicies.CampaignsWrite)]
     public async Task<IActionResult> Update([FromRoute] Guid id, [FromBody] UpdateCampaignRequest request, CancellationToken cancellationToken)
     {
         if (!_tenantProvider.GetTenantId().HasValue)
@@ -73,6 +79,7 @@ public sealed class CampaignsController : ControllerBase
     }
 
     [HttpPut("{id:guid}/pause")]
+    [Authorize(Policy = AuthorizationPolicies.CampaignsWrite)]
     public async Task<IActionResult> Pause([FromRoute] Guid id, CancellationToken cancellationToken)
     {
         if (!_tenantProvider.GetTenantId().HasValue)
@@ -83,6 +90,7 @@ public sealed class CampaignsController : ControllerBase
     }
 
     [HttpPut("{id:guid}/activate")]
+    [Authorize(Policy = AuthorizationPolicies.CampaignsWrite)]
     public async Task<IActionResult> Activate([FromRoute] Guid id, CancellationToken cancellationToken)
     {
         if (!_tenantProvider.GetTenantId().HasValue)

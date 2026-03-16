@@ -3,6 +3,7 @@ using AdsManager.Application.Interfaces;
 using AdsManager.Application.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using AdsManager.API.Authorization;
 
 namespace AdsManager.API.Controllers;
 
@@ -23,6 +24,7 @@ public sealed class AdSetsController : ControllerBase
     }
 
     [HttpGet]
+    [Authorize(Policy = AuthorizationPolicies.AdSetsRead)]
     public async Task<IActionResult> GetAdSets(CancellationToken cancellationToken)
     {
         if (!_tenantProvider.GetTenantId().HasValue)
@@ -33,6 +35,7 @@ public sealed class AdSetsController : ControllerBase
     }
 
     [HttpGet("{id:guid}")]
+    [Authorize(Policy = AuthorizationPolicies.AdSetsRead)]
     public async Task<IActionResult> GetAdSetById([FromRoute] Guid id, CancellationToken cancellationToken)
     {
         if (!_tenantProvider.GetTenantId().HasValue)
@@ -44,6 +47,7 @@ public sealed class AdSetsController : ControllerBase
 
 
     [HttpGet("{id:guid}/insights")]
+    [Authorize(Policy = AuthorizationPolicies.ReportsRead)]
     public async Task<IActionResult> GetInsightsByAdSet([FromRoute] Guid id, [FromQuery] DateOnly? dateFrom, [FromQuery] DateOnly? dateTo, CancellationToken cancellationToken)
     {
         if (!_tenantProvider.GetTenantId().HasValue)
@@ -54,6 +58,7 @@ public sealed class AdSetsController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Policy = AuthorizationPolicies.AdSetsWrite)]
     public async Task<IActionResult> Create([FromBody] CreateAdSetRequest request, CancellationToken cancellationToken)
     {
         if (!_tenantProvider.GetTenantId().HasValue)
@@ -64,6 +69,7 @@ public sealed class AdSetsController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
+    [Authorize(Policy = AuthorizationPolicies.AdSetsWrite)]
     public async Task<IActionResult> UpdateAdSet([FromRoute] Guid id, [FromBody] UpdateAdSetRequest request, CancellationToken cancellationToken)
     {
         if (!_tenantProvider.GetTenantId().HasValue)
@@ -74,6 +80,7 @@ public sealed class AdSetsController : ControllerBase
     }
 
     [HttpPut("{id:guid}/pause")]
+    [Authorize(Policy = AuthorizationPolicies.AdSetsWrite)]
     public async Task<IActionResult> PauseAdSet([FromRoute] Guid id, CancellationToken cancellationToken)
     {
         if (!_tenantProvider.GetTenantId().HasValue)
@@ -84,6 +91,7 @@ public sealed class AdSetsController : ControllerBase
     }
 
     [HttpPut("{id:guid}/activate")]
+    [Authorize(Policy = AuthorizationPolicies.AdSetsWrite)]
     public async Task<IActionResult> ActivateAdSet([FromRoute] Guid id, CancellationToken cancellationToken)
     {
         if (!_tenantProvider.GetTenantId().HasValue)
