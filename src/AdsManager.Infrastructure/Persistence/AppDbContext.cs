@@ -34,6 +34,8 @@ public abstract class AppDbContext<TContext> : DbContext, IApplicationDbContext
     public DbSet<ApiLog> ApiLogs => Set<ApiLog>();
     public DbSet<SyncCursor> SyncCursors => Set<SyncCursor>();
     public DbSet<SyncJobRun> SyncJobRuns => Set<SyncJobRun>();
+    public DbSet<Rule> Rules => Set<Rule>();
+    public DbSet<RuleExecutionLog> RuleExecutionLogs => Set<RuleExecutionLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

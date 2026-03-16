@@ -1,6 +1,6 @@
 namespace AdsManager.Application.Services;
 
-internal static class InsightsCacheKeys
+public static class InsightsCacheKeys
 {
     private const string Prefix = "insights";
 

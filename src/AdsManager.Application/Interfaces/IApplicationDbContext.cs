@@ -20,6 +20,8 @@ public interface IApplicationDbContext
     DbSet<ApiLog> ApiLogs { get; }
     DbSet<SyncCursor> SyncCursors { get; }
     DbSet<SyncJobRun> SyncJobRuns { get; }
+    DbSet<Rule> Rules { get; }
+    DbSet<RuleExecutionLog> RuleExecutionLogs { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
