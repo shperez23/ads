@@ -16,13 +16,15 @@ public sealed class RuleEvaluationJob
     private readonly IApplicationDbContext _dbContext;
     private readonly IMetaAdsService _metaAdsService;
     private readonly IJobExecutionGuard _jobExecutionGuard;
+    private readonly IObservabilityMetrics _observabilityMetrics;
 
-    public RuleEvaluationJob(IRuleRepository ruleRepository, IApplicationDbContext dbContext, IMetaAdsService metaAdsService, IJobExecutionGuard jobExecutionGuard)
+    public RuleEvaluationJob(IRuleRepository ruleRepository, IApplicationDbContext dbContext, IMetaAdsService metaAdsService, IJobExecutionGuard jobExecutionGuard, IObservabilityMetrics observabilityMetrics)
     {
         _ruleRepository = ruleRepository;
         _dbContext = dbContext;
         _metaAdsService = metaAdsService;
         _jobExecutionGuard = jobExecutionGuard;
+        _observabilityMetrics = observabilityMetrics;
     }
 
     public async Task ExecuteAsync(CancellationToken cancellationToken = default)
@@ -51,6 +53,7 @@ public sealed class RuleEvaluationJob
                         if (!shouldExecute)
                         {
                             await WriteLogAsync(rule, candidate, RuleExecutionStatus.Skipped, $"Condición no cumplida. MetricValue={candidate.MetricValue}", cancellationToken);
+                            _observabilityMetrics.RecordRuleExecution(rule.Action.ToString(), RuleExecutionStatus.Skipped);
                             continue;
                         }
 
@@ -58,11 +61,13 @@ public sealed class RuleEvaluationJob
                         {
                             var details = await ExecuteActionAsync(rule, candidate, cancellationToken);
                             await WriteLogAsync(rule, candidate, RuleExecutionStatus.Success, details, cancellationToken);
+                            _observabilityMetrics.RecordRuleExecution(rule.Action.ToString(), RuleExecutionStatus.Success);
                         }
                         catch (Exception ex)
                         {
                             Log.Error(ex, "Error ejecutando regla {RuleId} para entidad {EntityId}", rule.Id, candidate.EntityId);
                             await WriteLogAsync(rule, candidate, RuleExecutionStatus.Failed, ex.Message, cancellationToken);
+                            _observabilityMetrics.RecordRuleExecution(rule.Action.ToString(), RuleExecutionStatus.Failed);
                         }
                     }
                 }
