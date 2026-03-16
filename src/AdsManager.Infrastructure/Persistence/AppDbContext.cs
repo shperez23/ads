@@ -32,6 +32,8 @@ public abstract class AppDbContext<TContext> : DbContext, IApplicationDbContext
     public DbSet<InsightDaily> InsightsDaily => Set<InsightDaily>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<ApiLog> ApiLogs => Set<ApiLog>();
+    public DbSet<SyncCursor> SyncCursors => Set<SyncCursor>();
+    public DbSet<SyncJobRun> SyncJobRuns => Set<SyncJobRun>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -13,6 +13,10 @@ namespace AdsManager.Infrastructure.Integrations.Meta;
 public sealed class MetaAdsService : IMetaAdsService
 {
     private const string BaseUrl = "https://graph.facebook.com/v19.0/";
+    private const string CampaignEntityType = "Campaign";
+    private const string AdSetEntityType = "AdSet";
+    private const string AdEntityType = "Ad";
+    private const string InsightEntityType = "Insight";
     private readonly HttpClient _httpClient;
     private readonly IApplicationDbContext _dbContext;
     private readonly ILogger<MetaAdsService> _logger;
@@ -149,8 +153,16 @@ public sealed class MetaAdsService : IMetaAdsService
 
     public async Task SyncCampaignsAsync(Guid tenantId, string adAccountId, CancellationToken cancellationToken = default)
     {
+        var cursor = await GetOrCreateSyncCursorAsync(tenantId, adAccountId, CampaignEntityType, cancellationToken);
         var adAccount = await GetAdAccountAsync(tenantId, adAccountId, cancellationToken);
-        var campaigns = await GetCampaignsAsync(tenantId, adAccountId, cancellationToken);
+        var campaigns = await GetDataAsync(tenantId,
+            $"act_{adAccountId}/campaigns?fields=id,name,status,objective&updated_since={new DateTimeOffset(cursor.LastSyncedAt).ToUnixTimeSeconds()}",
+            e => new MetaCampaignDto(
+                e.GetProperty("id").GetString() ?? string.Empty,
+                e.GetProperty("name").GetString() ?? string.Empty,
+                e.GetProperty("status").GetString() ?? string.Empty,
+                e.TryGetProperty("objective", out var objective) ? objective.GetString() ?? string.Empty : string.Empty),
+            cancellationToken);
 
         foreach (var campaign in campaigns)
         {
@@ -176,10 +188,12 @@ public sealed class MetaAdsService : IMetaAdsService
         }
 
         await _dbContext.SaveChangesAsync(cancellationToken);
+        await UpdateSyncCursorAsync(cursor, cancellationToken);
     }
 
     public async Task SyncAdSetsAsync(Guid tenantId, string adAccountId, CancellationToken cancellationToken = default)
     {
+        var cursor = await GetOrCreateSyncCursorAsync(tenantId, adAccountId, AdSetEntityType, cancellationToken);
         var campaigns = await _dbContext.Campaigns.Where(x => x.TenantId == tenantId && x.AdAccount.MetaAccountId == adAccountId)
             .Select(x => new { x.Id, x.MetaCampaignId })
             .ToListAsync(cancellationToken);
@@ -187,7 +201,7 @@ public sealed class MetaAdsService : IMetaAdsService
         foreach (var campaign in campaigns)
         {
             var adSets = await GetDataAsync(tenantId,
-                $"{campaign.MetaCampaignId}/adsets?fields=id,campaign_id,name,status,daily_budget,billing_event,optimization_goal,targeting",
+                $"{campaign.MetaCampaignId}/adsets?fields=id,campaign_id,name,status,daily_budget,billing_event,optimization_goal,targeting&updated_since={new DateTimeOffset(cursor.LastSyncedAt).ToUnixTimeSeconds()}",
                 e => new MetaAdSetDto(
                     e.GetProperty("id").GetString() ?? string.Empty,
                     e.TryGetProperty("campaign_id", out var campaignId) ? campaignId.GetString() ?? string.Empty : string.Empty,
@@ -231,10 +245,12 @@ public sealed class MetaAdsService : IMetaAdsService
         }
 
         await _dbContext.SaveChangesAsync(cancellationToken);
+        await UpdateSyncCursorAsync(cursor, cancellationToken);
     }
 
     public async Task SyncAdsAsync(Guid tenantId, string adAccountId, CancellationToken cancellationToken = default)
     {
+        var cursor = await GetOrCreateSyncCursorAsync(tenantId, adAccountId, AdEntityType, cancellationToken);
         var adSets = await _dbContext.AdSets.Where(x => x.TenantId == tenantId && x.Campaign.AdAccount.MetaAccountId == adAccountId)
             .Select(x => new { x.Id, x.MetaAdSetId })
             .ToListAsync(cancellationToken);
@@ -242,7 +258,7 @@ public sealed class MetaAdsService : IMetaAdsService
         foreach (var adSet in adSets)
         {
             var ads = await GetDataAsync(tenantId,
-                $"{adSet.MetaAdSetId}/ads?fields=id,adset_id,name,status,creative",
+                $"{adSet.MetaAdSetId}/ads?fields=id,adset_id,name,status,creative&updated_since={new DateTimeOffset(cursor.LastSyncedAt).ToUnixTimeSeconds()}",
                 e => new MetaAdDto(
                     e.GetProperty("id").GetString() ?? string.Empty,
                     TryGetString(e, "adset_id"),
@@ -276,12 +292,17 @@ public sealed class MetaAdsService : IMetaAdsService
         }
 
         await _dbContext.SaveChangesAsync(cancellationToken);
+        await UpdateSyncCursorAsync(cursor, cancellationToken);
     }
 
     public async Task SyncInsightsAsync(Guid tenantId, string adAccountId, DateOnly since, DateOnly until, CancellationToken cancellationToken = default)
     {
+        var cursor = await GetOrCreateSyncCursorAsync(tenantId, adAccountId, InsightEntityType, cancellationToken);
+        var cursorDate = DateOnly.FromDateTime(cursor.LastSyncedAt);
+        var effectiveSince = cursorDate > since ? cursorDate : since;
+
         var adAccount = await GetAdAccountAsync(tenantId, adAccountId, cancellationToken);
-        var insights = await GetInsightsAsync(tenantId, adAccountId, since, until, cancellationToken);
+        var insights = await GetInsightsAsync(tenantId, adAccountId, effectiveSince, until, cancellationToken);
 
         foreach (var insight in insights)
         {
@@ -330,6 +351,7 @@ public sealed class MetaAdsService : IMetaAdsService
         }
 
         await _dbContext.SaveChangesAsync(cancellationToken);
+        await UpdateSyncCursorAsync(cursor, cancellationToken);
     }
 
     private async Task<IReadOnlyCollection<T>> GetDataAsync<T>(Guid tenantId, string endpoint, Func<JsonElement, T> mapper, CancellationToken cancellationToken)
@@ -432,6 +454,34 @@ public sealed class MetaAdsService : IMetaAdsService
             TargetingJson = request.TargetingJson
         });
 
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+
+    private async Task<SyncCursor> GetOrCreateSyncCursorAsync(Guid tenantId, string adAccountId, string entityType, CancellationToken cancellationToken)
+    {
+        var cursor = await _dbContext.SyncCursors
+            .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.AdAccountId == adAccountId && x.EntityType == entityType, cancellationToken);
+
+        if (cursor is not null)
+            return cursor;
+
+        cursor = new SyncCursor
+        {
+            TenantId = tenantId,
+            AdAccountId = adAccountId,
+            EntityType = entityType,
+            LastSyncedAt = DateTime.UnixEpoch
+        };
+
+        _dbContext.SyncCursors.Add(cursor);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return cursor;
+    }
+
+    private async Task UpdateSyncCursorAsync(SyncCursor cursor, CancellationToken cancellationToken)
+    {
+        cursor.LastSyncedAt = DateTime.UtcNow;
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 

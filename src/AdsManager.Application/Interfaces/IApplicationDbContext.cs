@@ -18,6 +18,8 @@ public interface IApplicationDbContext
     DbSet<InsightDaily> InsightsDaily { get; }
     DbSet<AuditLog> AuditLogs { get; }
     DbSet<ApiLog> ApiLogs { get; }
+    DbSet<SyncCursor> SyncCursors { get; }
+    DbSet<SyncJobRun> SyncJobRuns { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
