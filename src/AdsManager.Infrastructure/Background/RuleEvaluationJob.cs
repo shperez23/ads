@@ -15,41 +15,64 @@ public sealed class RuleEvaluationJob
     private readonly IRuleRepository _ruleRepository;
     private readonly IApplicationDbContext _dbContext;
     private readonly IMetaAdsService _metaAdsService;
+    private readonly IJobExecutionGuard _jobExecutionGuard;
 
-    public RuleEvaluationJob(IRuleRepository ruleRepository, IApplicationDbContext dbContext, IMetaAdsService metaAdsService)
+    public RuleEvaluationJob(IRuleRepository ruleRepository, IApplicationDbContext dbContext, IMetaAdsService metaAdsService, IJobExecutionGuard jobExecutionGuard)
     {
         _ruleRepository = ruleRepository;
         _dbContext = dbContext;
         _metaAdsService = metaAdsService;
+        _jobExecutionGuard = jobExecutionGuard;
     }
 
     public async Task ExecuteAsync(CancellationToken cancellationToken = default)
     {
         var rules = await _ruleRepository.GetActiveRulesAsync(cancellationToken);
+        var tenantIds = rules.Select(x => x.TenantId).Distinct().ToList();
 
-        foreach (var rule in rules)
+        foreach (var tenantId in tenantIds)
         {
-            var candidates = await ResolveCandidatesAsync(rule, cancellationToken);
-
-            foreach (var candidate in candidates)
+            var lease = await _jobExecutionGuard.TryStartAsync(nameof(RuleEvaluationJob), tenantId, null, cancellationToken);
+            if (!lease.Acquired)
             {
-                var shouldExecute = Evaluate(rule.Operator, candidate.MetricValue, rule.Threshold);
-                if (!shouldExecute)
+                Log.Information("RuleEvaluationJob skipped for tenant {TenantId} due to active execution", tenantId);
+                continue;
+            }
+
+            try
+            {
+                foreach (var rule in rules.Where(x => x.TenantId == tenantId))
                 {
-                    await WriteLogAsync(rule, candidate, RuleExecutionStatus.Skipped, $"Condición no cumplida. MetricValue={candidate.MetricValue}", cancellationToken);
-                    continue;
+                    var candidates = await ResolveCandidatesAsync(rule, cancellationToken);
+
+                    foreach (var candidate in candidates)
+                    {
+                        var shouldExecute = Evaluate(rule.Operator, candidate.MetricValue, rule.Threshold);
+                        if (!shouldExecute)
+                        {
+                            await WriteLogAsync(rule, candidate, RuleExecutionStatus.Skipped, $"Condición no cumplida. MetricValue={candidate.MetricValue}", cancellationToken);
+                            continue;
+                        }
+
+                        try
+                        {
+                            var details = await ExecuteActionAsync(rule, candidate, cancellationToken);
+                            await WriteLogAsync(rule, candidate, RuleExecutionStatus.Success, details, cancellationToken);
+                        }
+                        catch (Exception ex)
+                        {
+                            Log.Error(ex, "Error ejecutando regla {RuleId} para entidad {EntityId}", rule.Id, candidate.EntityId);
+                            await WriteLogAsync(rule, candidate, RuleExecutionStatus.Failed, ex.Message, cancellationToken);
+                        }
+                    }
                 }
 
-                try
-                {
-                    var details = await ExecuteActionAsync(rule, candidate, cancellationToken);
-                    await WriteLogAsync(rule, candidate, RuleExecutionStatus.Success, details, cancellationToken);
-                }
-                catch (Exception ex)
-                {
-                    Log.Error(ex, "Error ejecutando regla {RuleId} para entidad {EntityId}", rule.Id, candidate.EntityId);
-                    await WriteLogAsync(rule, candidate, RuleExecutionStatus.Failed, ex.Message, cancellationToken);
-                }
+                await _jobExecutionGuard.CompleteAsync(lease, SyncJobRunStatus.Succeeded, cancellationToken: cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                await _jobExecutionGuard.CompleteAsync(lease, SyncJobRunStatus.Failed, ex.Message, cancellationToken);
+                throw;
             }
         }
     }

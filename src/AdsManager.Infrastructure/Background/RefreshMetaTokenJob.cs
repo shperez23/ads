@@ -18,6 +18,7 @@ public sealed class RefreshMetaTokenJob
     private readonly IApplicationDbContext _dbContext;
     private readonly IAuditService _auditService;
     private readonly ILogger<RefreshMetaTokenJob> _logger;
+    private readonly IJobExecutionGuard _jobExecutionGuard;
 
     public RefreshMetaTokenJob(
         IMetaConnectionRepository metaConnectionRepository,
@@ -25,7 +26,8 @@ public sealed class RefreshMetaTokenJob
         ISecretEncryptionService secretEncryptionService,
         IApplicationDbContext dbContext,
         IAuditService auditService,
-        ILogger<RefreshMetaTokenJob> logger)
+        ILogger<RefreshMetaTokenJob> logger,
+        IJobExecutionGuard jobExecutionGuard)
     {
         _metaConnectionRepository = metaConnectionRepository;
         _metaConnectionApiClient = metaConnectionApiClient;
@@ -33,6 +35,7 @@ public sealed class RefreshMetaTokenJob
         _dbContext = dbContext;
         _auditService = auditService;
         _logger = logger;
+        _jobExecutionGuard = jobExecutionGuard;
     }
 
     public async Task ExecuteAsync(int expirationThresholdDays = 7, CancellationToken cancellationToken = default)
@@ -40,19 +43,44 @@ public sealed class RefreshMetaTokenJob
         var expiresBeforeUtc = DateTime.UtcNow.AddDays(expirationThresholdDays);
         var expiringConnections = await _metaConnectionRepository.GetConnectionsExpiringBeforeAsync(expiresBeforeUtc, cancellationToken);
 
-        foreach (var connection in expiringConnections)
+        var tenantIds = expiringConnections
+            .Select(x => x.TenantId)
+            .Distinct()
+            .ToList();
+
+        foreach (var tenantId in tenantIds)
         {
+            var lease = await _jobExecutionGuard.TryStartAsync(nameof(RefreshMetaTokenJob), tenantId, null, cancellationToken);
+            if (!lease.Acquired)
+            {
+                _logger.LogInformation("Skipping RefreshMetaTokenJob for tenant {TenantId} due to active execution", tenantId);
+                continue;
+            }
+
             try
             {
-                await RefreshConnectionAsync(connection, expirationThresholdDays, cancellationToken);
+                foreach (var connection in expiringConnections.Where(x => x.TenantId == tenantId))
+                {
+                    try
+                    {
+                        await RefreshConnectionAsync(connection, expirationThresholdDays, cancellationToken);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "RefreshMetaTokenJob failed for connection {ConnectionId}", connection.Id);
+                        connection.LastHealthCheckAt = DateTime.UtcNow;
+                        connection.LastHealthCheckStatus = "RefreshError";
+                        connection.LastHealthCheckDetails = ex.Message;
+                        await _metaConnectionRepository.UpdateAsync(connection, cancellationToken);
+                    }
+                }
+
+                await _jobExecutionGuard.CompleteAsync(lease, SyncJobRunStatus.Succeeded, cancellationToken: cancellationToken);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "RefreshMetaTokenJob failed for connection {ConnectionId}", connection.Id);
-                connection.LastHealthCheckAt = DateTime.UtcNow;
-                connection.LastHealthCheckStatus = "RefreshError";
-                connection.LastHealthCheckDetails = ex.Message;
-                await _metaConnectionRepository.UpdateAsync(connection, cancellationToken);
+                await _jobExecutionGuard.CompleteAsync(lease, SyncJobRunStatus.Failed, ex.Message, cancellationToken);
+                throw;
             }
         }
     }

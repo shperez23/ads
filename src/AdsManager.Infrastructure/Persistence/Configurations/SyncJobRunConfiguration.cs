@@ -12,9 +12,14 @@ public sealed class SyncJobRunConfiguration : IEntityTypeConfiguration<SyncJobRu
         builder.HasKey(x => x.Id);
 
         builder.Property(x => x.JobName).HasMaxLength(100).IsRequired();
+        builder.Property(x => x.AdAccountId).HasMaxLength(100);
+        builder.Property(x => x.LogicalKey).HasMaxLength(260).IsRequired();
         builder.Property(x => x.Status).HasMaxLength(20).IsRequired();
         builder.Property(x => x.Error).HasColumnType("text");
 
         builder.HasIndex(x => new { x.JobName, x.StartedAt });
+        builder.HasIndex(x => new { x.LogicalKey, x.Status })
+            .HasFilter("\"Status\" = 'Running'")
+            .IsUnique();
     }
 }
