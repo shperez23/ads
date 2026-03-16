@@ -20,7 +20,8 @@ public static class InfrastructureServiceCollectionExtensions
     {
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
 
-        var connectionString = configuration.GetConnectionString("DefaultConnection")
+        var connectionString = Environment.GetEnvironmentVariable("ADSMANAGER_DB_CONNECTION")
+            ?? configuration.GetConnectionString("DefaultConnection")
             ?? throw new InvalidOperationException("DefaultConnection is not configured");
 
         services.AddDbContext<AdsManagerDbContext>(options =>
