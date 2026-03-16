@@ -52,6 +52,7 @@ builder.Services.AddValidatorsFromAssemblyContaining<RegisterRequestValidator>()
 builder.Services.AddFluentValidationAutoValidation();
 builder.Services.AddConfiguredHealthChecks();
 builder.Services.AddConfiguredCors(builder.Configuration);
+builder.Services.AddConfiguredObservability(builder.Configuration);
 
 var authProtection = builder.Configuration.GetSection(AuthProtectionOptions.SectionName).Get<AuthProtectionOptions>() ?? new AuthProtectionOptions();
 var cors = builder.Configuration.GetSection(CorsOptions.SectionName).Get<CorsOptions>() ?? new CorsOptions();
@@ -220,6 +221,7 @@ using (var scope = app.Services.CreateScope())
 
 app.UseMiddleware<TraceContextMiddleware>();
 app.UseMiddleware<GlobalExceptionMiddleware>();
+app.UseMiddleware<RequestMetricsMiddleware>();
 app.UseConfiguredSwagger();
 
 app.UseSerilogRequestLogging(options =>
@@ -240,5 +242,6 @@ app.RegisterRecurringSyncJobs();
 
 app.MapControllers();
 app.MapConfiguredHealthChecks(app.Configuration);
+app.UseConfiguredMetricsEndpoint();
 
 app.Run();

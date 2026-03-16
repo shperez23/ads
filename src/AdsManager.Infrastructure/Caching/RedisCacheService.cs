@@ -11,11 +11,13 @@ public sealed class RedisCacheService : ICacheService
     private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web);
     private readonly IConnectionMultiplexer _connectionMultiplexer;
     private readonly RedisCacheOptions _options;
+    private readonly IObservabilityMetrics _observabilityMetrics;
 
-    public RedisCacheService(IConnectionMultiplexer connectionMultiplexer, IOptions<CacheOptions> cacheOptions)
+    public RedisCacheService(IConnectionMultiplexer connectionMultiplexer, IOptions<CacheOptions> cacheOptions, IObservabilityMetrics observabilityMetrics)
     {
         _connectionMultiplexer = connectionMultiplexer;
         _options = cacheOptions.Value.Redis;
+        _observabilityMetrics = observabilityMetrics;
     }
 
     public async Task<T> GetOrCreateAsync<T>(string key, Func<CancellationToken, Task<T>> factory, TimeSpan ttl, CancellationToken cancellationToken = default)
@@ -28,9 +30,13 @@ public sealed class RedisCacheService : ICacheService
         {
             var deserialized = JsonSerializer.Deserialize<T>(cachedValue!, SerializerOptions);
             if (deserialized is not null)
+            {
+                _observabilityMetrics.RecordCacheHit("redis", ResolveCacheName(key));
                 return deserialized;
+            }
         }
 
+        _observabilityMetrics.RecordCacheMiss("redis", ResolveCacheName(key));
         var created = await factory(cancellationToken);
         var effectiveTtl = ttl > TimeSpan.Zero
             ? ttl
@@ -78,4 +84,12 @@ public sealed class RedisCacheService : ICacheService
         => string.IsNullOrWhiteSpace(_options.InstanceName)
             ? key
             : $"{_options.InstanceName}:{key}";
+
+    private static string ResolveCacheName(string key)
+    {
+        var separatorIndex = key.IndexOf(':');
+        return separatorIndex > 0
+            ? key[..separatorIndex]
+            : key;
+    }
 }

@@ -6,19 +6,25 @@ namespace AdsManager.Infrastructure.Caching;
 public sealed class MemoryCacheService : ICacheService
 {
     private readonly IMemoryCache _memoryCache;
+    private readonly IObservabilityMetrics _observabilityMetrics;
     private readonly HashSet<string> _keys = [];
     private readonly SemaphoreSlim _keysLock = new(1, 1);
 
-    public MemoryCacheService(IMemoryCache memoryCache)
+    public MemoryCacheService(IMemoryCache memoryCache, IObservabilityMetrics observabilityMetrics)
     {
         _memoryCache = memoryCache;
+        _observabilityMetrics = observabilityMetrics;
     }
 
     public async Task<T> GetOrCreateAsync<T>(string key, Func<CancellationToken, Task<T>> factory, TimeSpan ttl, CancellationToken cancellationToken = default)
     {
         if (_memoryCache.TryGetValue(key, out T? cached) && cached is not null)
+        {
+            _observabilityMetrics.RecordCacheHit("memory", ResolveCacheName(key));
             return cached;
+        }
 
+        _observabilityMetrics.RecordCacheMiss("memory", ResolveCacheName(key));
         var value = await factory(cancellationToken);
 
         var options = new MemoryCacheEntryOptions
@@ -89,5 +95,13 @@ public sealed class MemoryCacheService : ICacheService
 
         foreach (var key in keysToDelete)
             _memoryCache.Remove(key);
+    }
+
+    private static string ResolveCacheName(string key)
+    {
+        var separatorIndex = key.IndexOf(':');
+        return separatorIndex > 0
+            ? key[..separatorIndex]
+            : key;
     }
 }
