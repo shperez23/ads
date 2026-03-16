@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using System.Globalization;
+using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using AdsManager.Application.DTOs.Meta;
@@ -7,6 +9,10 @@ using AdsManager.Application.Interfaces.Meta;
 using AdsManager.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Polly;
+using Polly.CircuitBreaker;
+using Polly.Retry;
+using Polly.Timeout;
 
 namespace AdsManager.Infrastructure.Integrations.Meta;
 
@@ -21,6 +27,9 @@ public sealed class MetaAdsService : IMetaAdsService
     private readonly IApplicationDbContext _dbContext;
     private readonly ILogger<MetaAdsService> _logger;
     private readonly ISecretEncryptionService _secretEncryptionService;
+    private readonly AsyncRetryPolicy<HttpResponseMessage> _retryPolicy;
+    private readonly AsyncCircuitBreakerPolicy<HttpResponseMessage> _circuitBreakerPolicy;
+    private readonly AsyncTimeoutPolicy<HttpResponseMessage> _timeoutPolicy;
 
     public MetaAdsService(HttpClient httpClient, IApplicationDbContext dbContext, ILogger<MetaAdsService> logger, ISecretEncryptionService secretEncryptionService)
     {
@@ -29,6 +38,47 @@ public sealed class MetaAdsService : IMetaAdsService
         _logger = logger;
         _secretEncryptionService = secretEncryptionService;
         _httpClient.BaseAddress = new Uri(BaseUrl);
+
+        _retryPolicy = Policy<HttpResponseMessage>
+            .Handle<HttpRequestException>()
+            .Or<TaskCanceledException>()
+            .OrResult(IsTransientResponse)
+            .WaitAndRetryAsync(
+                retryCount: 3,
+                sleepDurationProvider: attempt => TimeSpan.FromSeconds(Math.Pow(2, attempt)),
+                onRetry: (outcome, delay, attempt, _) =>
+                {
+                    var statusCode = outcome.Result?.StatusCode;
+                    _logger.LogWarning(
+                        "Retry Meta API attempt {Attempt} in {Delay}s due to status {StatusCode} or transient network failure",
+                        attempt,
+                        delay.TotalSeconds,
+                        statusCode);
+                });
+
+        _circuitBreakerPolicy = Policy<HttpResponseMessage>
+            .Handle<HttpRequestException>()
+            .Or<TaskCanceledException>()
+            .OrResult(IsTransientResponse)
+            .CircuitBreakerAsync(
+                exceptionsAllowedBeforeBreaking: 5,
+                durationOfBreak: TimeSpan.FromSeconds(30),
+                onBreak: (outcome, breakDelay) =>
+                {
+                    var statusCode = outcome.Result?.StatusCode;
+                    _logger.LogError("Meta API circuit opened for {BreakDelay}s. LastStatus={StatusCode}", breakDelay.TotalSeconds, statusCode);
+                },
+                onReset: () => _logger.LogInformation("Meta API circuit reset"),
+                onHalfOpen: () => _logger.LogInformation("Meta API circuit half-open, testing next request"));
+
+        _timeoutPolicy = Policy.TimeoutAsync<HttpResponseMessage>(
+            TimeSpan.FromSeconds(15),
+            TimeoutStrategy.Optimistic,
+            onTimeoutAsync: (_, timeout, _, _) =>
+            {
+                _logger.LogError("Meta API timeout after {TimeoutSeconds}s", timeout.TotalSeconds);
+                return Task.CompletedTask;
+            });
     }
 
     public Task<IReadOnlyCollection<MetaAdAccountDto>> GetAdAccountsAsync(Guid tenantId, CancellationToken cancellationToken = default)
@@ -122,27 +172,14 @@ public sealed class MetaAdsService : IMetaAdsService
             },
             cancellationToken);
 
-    public Task UpdateAdAsync(Guid tenantId, MetaAdUpdateRequest request, CancellationToken cancellationToken = default)
-        => PostAsync(
-            tenantId,
-            request.AdId,
-            new Dictionary<string, string>
-            {
-                ["name"] = request.Name,
-                ["status"] = request.Status,
-                ["creative"] = request.CreativeJson
-            },
-            cancellationToken);
-
     public Task UpdateAdStatusAsync(Guid tenantId, MetaAdStatusUpdateRequest request, CancellationToken cancellationToken = default)
         => PostAsync(tenantId, request.AdId, new Dictionary<string, string> { ["status"] = request.Status }, cancellationToken);
 
     public Task<IReadOnlyCollection<MetaInsightDto>> GetInsightsAsync(Guid tenantId, string adAccountId, DateOnly since, DateOnly until, CancellationToken cancellationToken = default)
         => GetDataAsync(tenantId,
-            $"act_{adAccountId}/insights?fields=date_start,date_stop,campaign_id,campaign_name,spend,impressions,clicks,ctr&level=campaign&time_range={{\"since\":\"{since:yyyy-MM-dd}\",\"until\":\"{until:yyyy-MM-dd}\"}}",
+            $"act_{adAccountId}/insights?fields=date_start,campaign_id,campaign_name,spend,impressions,clicks,ctr&time_range={{\"since\":\"{since:yyyy-MM-dd}\",\"until\":\"{until:yyyy-MM-dd}\"}}&level=campaign",
             e => new MetaInsightDto(
-                e.GetProperty("date_start").GetString() ?? string.Empty,
-                e.GetProperty("date_stop").GetString() ?? string.Empty,
+                e.TryGetProperty("date_start", out var dateStart) ? dateStart.GetString() ?? string.Empty : string.Empty,
                 e.TryGetProperty("campaign_id", out var campaignId) ? campaignId.GetString() ?? string.Empty : string.Empty,
                 e.TryGetProperty("campaign_name", out var campaignName) ? campaignName.GetString() ?? string.Empty : string.Empty,
                 e.TryGetProperty("spend", out var spend) ? spend.GetString() ?? "0" : "0",
@@ -359,11 +396,15 @@ public sealed class MetaAdsService : IMetaAdsService
         var accessToken = await GetAccessTokenAsync(tenantId, cancellationToken);
         var url = endpoint.Contains('?') ? $"{endpoint}&access_token={Uri.EscapeDataString(accessToken)}" : $"{endpoint}?access_token={Uri.EscapeDataString(accessToken)}";
 
-        using var response = await _httpClient.GetAsync(url, cancellationToken);
+        using var response = await ExecuteWithResilienceAsync(
+            endpoint,
+            HttpMethod.Get.Method,
+            string.Empty,
+            ct => _httpClient.GetAsync(url, ct),
+            cancellationToken);
+
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
 
-        await LogApiAsync(endpoint, HttpMethod.Get.Method, string.Empty, json, (int)response.StatusCode, cancellationToken);
-        _logger.LogInformation("Meta API GET {Endpoint} responded with {StatusCode}", endpoint, response.StatusCode);
         response.EnsureSuccessStatusCode();
 
         using var doc = JsonDocument.Parse(json);
@@ -382,15 +423,86 @@ public sealed class MetaAdsService : IMetaAdsService
     {
         var accessToken = await GetAccessTokenAsync(tenantId, cancellationToken);
         body["access_token"] = accessToken;
+        var requestJson = JsonSerializer.Serialize(body);
 
-        using var response = await _httpClient.PostAsJsonAsync(endpoint, body, cancellationToken);
+        using var response = await ExecuteWithResilienceAsync(
+            endpoint,
+            HttpMethod.Post.Method,
+            requestJson,
+            ct => _httpClient.PostAsJsonAsync(endpoint, body, ct),
+            cancellationToken);
+
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
-        await LogApiAsync(endpoint, HttpMethod.Post.Method, JsonSerializer.Serialize(body), json, (int)response.StatusCode, cancellationToken);
-        _logger.LogInformation("Meta API POST {Endpoint} responded with {StatusCode}", endpoint, response.StatusCode);
         response.EnsureSuccessStatusCode();
 
         return json;
     }
+
+    private async Task<HttpResponseMessage> ExecuteWithResilienceAsync(
+        string endpoint,
+        string method,
+        string request,
+        Func<CancellationToken, Task<HttpResponseMessage>> operation,
+        CancellationToken cancellationToken)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        HttpResponseMessage? response = null;
+        string responseBody = "{}";
+        string status = "Unknown";
+        int statusCode = 0;
+
+        try
+        {
+            response = await _retryPolicy.ExecuteAsync(async ct =>
+                await _circuitBreakerPolicy.ExecuteAsync(async innerCt =>
+                    await _timeoutPolicy.ExecuteAsync(timeoutCt => operation(timeoutCt), innerCt), ct), cancellationToken);
+
+            statusCode = (int)response.StatusCode;
+            status = response.IsSuccessStatusCode ? "Success" : "HttpError";
+            responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+
+            if (response.StatusCode == (HttpStatusCode)429)
+            {
+                _logger.LogWarning("Meta API rate limit hit on {Endpoint}. StatusCode={StatusCode}", endpoint, statusCode);
+            }
+            else if ((int)response.StatusCode >= 500)
+            {
+                _logger.LogError("Meta API server error on {Endpoint}. StatusCode={StatusCode}", endpoint, statusCode);
+            }
+
+            _logger.LogInformation("Meta API {Method} {Endpoint} responded with {StatusCode}", method, endpoint, response.StatusCode);
+            return response;
+        }
+        catch (BrokenCircuitException ex)
+        {
+            status = "CircuitOpen";
+            responseBody = ex.Message;
+            _logger.LogError(ex, "Meta API circuit breaker open for {Endpoint}", endpoint);
+            throw;
+        }
+        catch (TimeoutRejectedException ex)
+        {
+            status = "Timeout";
+            responseBody = ex.Message;
+            _logger.LogError(ex, "Meta API timeout for {Endpoint}", endpoint);
+            throw;
+        }
+        catch (HttpRequestException ex)
+        {
+            status = "NetworkFailure";
+            responseBody = ex.Message;
+            _logger.LogError(ex, "Meta API network failure for {Endpoint}", endpoint);
+            throw;
+        }
+        finally
+        {
+            stopwatch.Stop();
+            await LogApiAsync(endpoint, method, request, responseBody, statusCode, status, stopwatch.ElapsedMilliseconds, cancellationToken);
+        }
+    }
+
+    private static bool IsTransientResponse(HttpResponseMessage response)
+        => response.StatusCode == HttpStatusCode.TooManyRequests || (int)response.StatusCode >= 500;
 
     private async Task<string> GetAccessTokenAsync(Guid tenantId, CancellationToken cancellationToken)
     {
@@ -485,7 +597,7 @@ public sealed class MetaAdsService : IMetaAdsService
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    private async Task LogApiAsync(string endpoint, string method, string requestJson, string responseJson, int statusCode, CancellationToken cancellationToken)
+    private async Task LogApiAsync(string endpoint, string method, string requestJson, string responseJson, int statusCode, string status, long durationMs, CancellationToken cancellationToken)
     {
         _dbContext.ApiLogs.Add(new ApiLog
         {
@@ -494,7 +606,9 @@ public sealed class MetaAdsService : IMetaAdsService
             Method = method,
             RequestJson = requestJson,
             ResponseJson = responseJson,
-            StatusCode = statusCode
+            StatusCode = statusCode,
+            Status = status,
+            DurationMs = durationMs
         });
 
         await _dbContext.SaveChangesAsync(cancellationToken);

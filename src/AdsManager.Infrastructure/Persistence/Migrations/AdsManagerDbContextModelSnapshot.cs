@@ -219,6 +219,9 @@ namespace AdsManager.Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<long>("DurationMs")
+                        .HasColumnType("bigint");
+
                     b.Property<string>("Endpoint")
                         .IsRequired()
                         .HasMaxLength(400)
@@ -241,6 +244,11 @@ namespace AdsManager.Infrastructure.Persistence.Migrations
                     b.Property<string>("ResponseJson")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
 
                     b.Property<int>("StatusCode")
                         .HasColumnType("integer");
