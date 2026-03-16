@@ -1,0 +1,72 @@
+using AdsManager.Application.DTOs.Meta;
+using AdsManager.Application.Interfaces;
+using AdsManager.Application.Interfaces.Services;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+
+namespace AdsManager.API.Controllers;
+
+[ApiController]
+[Authorize]
+[Route("api/meta/connections")]
+public sealed class MetaConnectionsController : ControllerBase
+{
+    private readonly IMetaConnectionService _metaConnectionService;
+    private readonly ITenantProvider _tenantProvider;
+
+    public MetaConnectionsController(IMetaConnectionService metaConnectionService, ITenantProvider tenantProvider)
+    {
+        _metaConnectionService = metaConnectionService;
+        _tenantProvider = tenantProvider;
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> GetConnections(CancellationToken cancellationToken)
+    {
+        if (!_tenantProvider.GetTenantId().HasValue)
+            return Unauthorized();
+
+        var result = await _metaConnectionService.GetConnectionsAsync(cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> CreateConnection([FromBody] CreateMetaConnectionRequest request, CancellationToken cancellationToken)
+    {
+        if (!_tenantProvider.GetTenantId().HasValue)
+            return Unauthorized();
+
+        var result = await _metaConnectionService.CreateConnectionAsync(request, cancellationToken);
+        return result.Success ? Ok(result) : BadRequest(result);
+    }
+
+    [HttpPut("{id:guid}")]
+    public async Task<IActionResult> UpdateConnection([FromRoute] Guid id, [FromBody] UpdateMetaConnectionRequest request, CancellationToken cancellationToken)
+    {
+        if (!_tenantProvider.GetTenantId().HasValue)
+            return Unauthorized();
+
+        var result = await _metaConnectionService.UpdateConnectionAsync(id, request, cancellationToken);
+        return result.Success ? Ok(result) : NotFound(result);
+    }
+
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> DeleteConnection([FromRoute] Guid id, CancellationToken cancellationToken)
+    {
+        if (!_tenantProvider.GetTenantId().HasValue)
+            return Unauthorized();
+
+        var result = await _metaConnectionService.DeleteConnectionAsync(id, cancellationToken);
+        return result.Success ? Ok(result) : NotFound(result);
+    }
+
+    [HttpPost("{id:guid}/validate")]
+    public async Task<IActionResult> ValidateConnection([FromRoute] Guid id, CancellationToken cancellationToken)
+    {
+        if (!_tenantProvider.GetTenantId().HasValue)
+            return Unauthorized();
+
+        var result = await _metaConnectionService.ValidateConnectionAsync(id, cancellationToken);
+        return result.Success ? Ok(result) : NotFound(result);
+    }
+}
