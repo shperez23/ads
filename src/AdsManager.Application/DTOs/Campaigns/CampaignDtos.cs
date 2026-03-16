@@ -18,8 +18,7 @@ public sealed record CreateCampaignRequest(
     string Objective,
     string Status,
     long? DailyBudget,
-    long? LifetimeBudget,
-    string AccessToken);
+    long? LifetimeBudget);
 
 public sealed record UpdateCampaignRequest(
     string Name,

@@ -1,25 +1,37 @@
 using AdsManager.Application.Common;
 using AdsManager.Application.DTOs.Insights;
-using AdsManager.Application.Interfaces.Repositories;
+using AdsManager.Application.Interfaces;
 using AdsManager.Application.Interfaces.Services;
+using Microsoft.EntityFrameworkCore;
 
 namespace AdsManager.Application.Services;
 
 public sealed class ReportService : IReportService
 {
-    private readonly IInsightRepository _insightRepository;
+    private readonly IApplicationDbContext _dbContext;
 
-    public ReportService(IInsightRepository insightRepository)
+    public ReportService(IApplicationDbContext dbContext)
     {
-        _insightRepository = insightRepository;
+        _dbContext = dbContext;
     }
 
-    public async Task<Result<IReadOnlyCollection<InsightDto>>> GetInsightsAsync(Guid tenantId, DateOnly from, DateOnly to, CancellationToken cancellationToken = default)
+    public async Task<Result<IReadOnlyCollection<InsightDto>>> GetInsightsAsync(Guid tenantId, DashboardFilter filter, CancellationToken cancellationToken = default)
     {
-        if (from > to)
-            return Result<IReadOnlyCollection<InsightDto>>.Fail("Rango de fechas inválido");
+        var query = _dbContext.InsightsDaily.AsNoTracking().Where(x => x.TenantId == tenantId);
 
-        var insights = await _insightRepository.GetByDateRangeAsync(tenantId, from, to, cancellationToken);
+        if (filter.DateFrom.HasValue)
+            query = query.Where(x => x.Date >= filter.DateFrom.Value);
+
+        if (filter.DateTo.HasValue)
+            query = query.Where(x => x.Date <= filter.DateTo.Value);
+
+        if (filter.CampaignId.HasValue)
+            query = query.Where(x => x.CampaignId == filter.CampaignId.Value);
+
+        if (filter.AdAccountId.HasValue)
+            query = query.Where(x => x.AdAccountId == filter.AdAccountId.Value);
+
+        var insights = await query.OrderByDescending(x => x.Date).ToListAsync(cancellationToken);
 
         var response = insights
             .Select(x => new InsightDto(x.Id, x.AdAccountId, x.CampaignId, x.AdSetId, x.AdId, x.Date, x.Impressions, x.Reach, x.Clicks, x.LinkClicks, x.Spend, x.Cpm, x.Cpc, x.Ctr))

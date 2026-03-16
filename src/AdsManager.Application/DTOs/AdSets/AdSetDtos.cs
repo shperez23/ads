@@ -22,5 +22,4 @@ public sealed record CreateAdSetRequest(
     string BillingEvent,
     string OptimizationGoal,
     string TargetingJson,
-    string AccessToken,
     string BidStrategy = "LOWEST_COST_WITHOUT_CAP");

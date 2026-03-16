@@ -30,6 +30,7 @@ builder.Services.AddScoped<ICampaignService, CampaignService>();
 builder.Services.AddScoped<IAdSetService, AdSetService>();
 builder.Services.AddScoped<IAdsService, AdsService>();
 builder.Services.AddScoped<IReportService, ReportService>();
+builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddAutoMapper(cfg => cfg.AddProfile<AuthMappingProfile>());
 builder.Services.AddValidatorsFromAssemblyContaining<RegisterRequestValidator>();
 builder.Services.AddFluentValidationAutoValidation();
@@ -96,7 +97,8 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.UseHangfireDashboard("/hangfire");
-RecurringJob.AddOrUpdate<InsightsSyncJob>("sync-insights-daily", job => job.ExecuteAsync(default), Cron.Daily);
+RecurringJob.AddOrUpdate<SyncCampaignsJob>("sync-campaigns-6-hours", job => job.ExecuteAsync(default), "0 */6 * * *");
+RecurringJob.AddOrUpdate<SyncInsightsJob>("sync-insights-24-hours", job => job.ExecuteAsync(default), Cron.Daily);
 
 app.MapControllers();
 

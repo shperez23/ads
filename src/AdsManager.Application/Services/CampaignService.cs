@@ -7,6 +7,7 @@ using AdsManager.Application.Interfaces.Repositories;
 using AdsManager.Application.Interfaces.Services;
 using AdsManager.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 namespace AdsManager.Application.Services;
 
@@ -46,9 +47,8 @@ public sealed class CampaignService : ICampaignService
         if (adAccount is null)
             return Result<CampaignDto>.Fail("Ad account no encontrada para el tenant");
 
-        var metaId = await _metaAdsService.CreateCampaignAsync(adAccount.MetaAccountId,
+        var metaId = await _metaAdsService.CreateCampaignAsync(tenantId, adAccount.MetaAccountId,
             new MetaCampaignCreateRequest(request.Name, request.Objective, request.Status, request.DailyBudget, request.LifetimeBudget),
-            request.AccessToken,
             cancellationToken);
 
         var campaign = new Campaign
@@ -64,6 +64,7 @@ public sealed class CampaignService : ICampaignService
         };
 
         await _campaignRepository.AddAsync(campaign, cancellationToken);
+        await WriteAuditLogAsync(tenantId, null, "create campaign", nameof(Campaign), campaign.Id.ToString(), campaign, cancellationToken);
         return Result<CampaignDto>.Ok(Map(campaign), "Campaña creada correctamente");
     }
 
@@ -82,25 +83,27 @@ public sealed class CampaignService : ICampaignService
         campaign.EndDate = request.EndDate;
 
         await _campaignRepository.UpdateAsync(campaign, cancellationToken);
+        await WriteAuditLogAsync(tenantId, null, "update campaign", nameof(Campaign), campaign.Id.ToString(), request, cancellationToken);
         return Result<CampaignDto>.Ok(Map(campaign), "Campaña actualizada correctamente");
     }
 
-    public Task<Result<CampaignDto>> PauseAsync(Guid tenantId, Guid campaignId, string accessToken, CancellationToken cancellationToken = default)
-        => ChangeStatusAsync(tenantId, campaignId, "PAUSED", accessToken, cancellationToken);
+    public Task<Result<CampaignDto>> PauseAsync(Guid tenantId, Guid campaignId, Guid? userId, CancellationToken cancellationToken = default)
+        => ChangeStatusAsync(tenantId, campaignId, "PAUSED", userId, cancellationToken);
 
-    public Task<Result<CampaignDto>> ActivateAsync(Guid tenantId, Guid campaignId, string accessToken, CancellationToken cancellationToken = default)
-        => ChangeStatusAsync(tenantId, campaignId, "ACTIVE", accessToken, cancellationToken);
+    public Task<Result<CampaignDto>> ActivateAsync(Guid tenantId, Guid campaignId, Guid? userId, CancellationToken cancellationToken = default)
+        => ChangeStatusAsync(tenantId, campaignId, "ACTIVE", userId, cancellationToken);
 
-    private async Task<Result<CampaignDto>> ChangeStatusAsync(Guid tenantId, Guid campaignId, string status, string accessToken, CancellationToken cancellationToken)
+    private async Task<Result<CampaignDto>> ChangeStatusAsync(Guid tenantId, Guid campaignId, string status, Guid? userId, CancellationToken cancellationToken)
     {
         var campaign = await _campaignRepository.GetByIdAsync(tenantId, campaignId, cancellationToken);
         if (campaign is null)
             return Result<CampaignDto>.Fail("Campaña no encontrada");
 
-        await _metaAdsService.UpdateCampaignStatusAsync(new MetaCampaignStatusUpdateRequest(campaign.MetaCampaignId, status), accessToken, cancellationToken);
+        await _metaAdsService.UpdateCampaignStatusAsync(tenantId, new MetaCampaignStatusUpdateRequest(campaign.MetaCampaignId, status), cancellationToken);
 
         campaign.Status = status;
         await _campaignRepository.UpdateAsync(campaign, cancellationToken);
+        await WriteAuditLogAsync(tenantId, userId, status == "PAUSED" ? "pause campaign" : "update campaign", nameof(Campaign), campaign.Id.ToString(), new { campaign.Status }, cancellationToken);
 
         return Result<CampaignDto>.Ok(Map(campaign), $"Estado actualizado a {status}");
     }
@@ -117,4 +120,19 @@ public sealed class CampaignService : ICampaignService
             campaign.LifetimeBudget,
             campaign.StartDate,
             campaign.EndDate);
+
+    private async Task WriteAuditLogAsync(Guid tenantId, Guid? userId, string action, string entityName, string entityId, object payload, CancellationToken cancellationToken)
+    {
+        _dbContext.AuditLogs.Add(new AuditLog
+        {
+            TenantId = tenantId,
+            UserId = userId ?? Guid.Empty,
+            Action = action,
+            EntityName = entityName,
+            EntityId = entityId,
+            PayloadJson = JsonSerializer.Serialize(payload)
+        });
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
 }
