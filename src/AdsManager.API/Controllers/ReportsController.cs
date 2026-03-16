@@ -33,12 +33,7 @@ public sealed class ReportsController : ControllerBase
     }
 
     [HttpGet("dashboard")]
-    public async Task<IActionResult> GetDashboard([FromQuery] DateOnly? dateFrom, [FromQuery] DateOnly? dateTo, [FromQuery] Guid? campaignId, [FromQuery] Guid? adAccountId, CancellationToken cancellationToken)
-    {
-        if (!_tenantProvider.GetTenantId().HasValue)
-            return Unauthorized();
-
-        var result = await _dashboardService.GetDashboardAsync(new DashboardFilter(dateFrom, dateTo, campaignId, adAccountId), cancellationToken);
-        return Ok(result);
-    }
+    [Obsolete("Use GET /api/dashboard. This endpoint will be removed in a future release.")]
+    public Task<IActionResult> GetDashboard([FromQuery] DateOnly? dateFrom, [FromQuery] DateOnly? dateTo, [FromQuery] Guid? campaignId, [FromQuery] Guid? adAccountId, CancellationToken cancellationToken)
+        => DashboardEndpointHandler.HandleGetAsync(this, _dashboardService, _tenantProvider, dateFrom, dateTo, campaignId, adAccountId, cancellationToken, markAsDeprecated: true);
 }
