@@ -18,7 +18,7 @@ public sealed class AdSetConfiguration : IEntityTypeConfiguration<AdSet>
         builder.Property(x => x.BillingEvent).HasMaxLength(100).IsRequired();
         builder.Property(x => x.OptimizationGoal).HasMaxLength(100).IsRequired();
         builder.Property(x => x.BidStrategy).HasMaxLength(100).IsRequired();
-        builder.Property(x => x.TargetingJson).HasColumnType("nvarchar(max)").IsRequired();
+        builder.Property(x => x.TargetingJson).HasColumnType("text").IsRequired();
 
         builder.HasIndex(x => new { x.TenantId, x.MetaAdSetId }).IsUnique();
         builder.HasIndex(x => new { x.TenantId, x.CampaignId });

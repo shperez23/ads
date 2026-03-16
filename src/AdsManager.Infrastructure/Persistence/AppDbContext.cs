@@ -5,9 +5,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AdsManager.Infrastructure.Persistence;
 
-public class AppDbContext : DbContext, IApplicationDbContext
+public abstract class AppDbContext<TContext> : DbContext, IApplicationDbContext
+    where TContext : DbContext
 {
-    public AppDbContext(DbContextOptions options) : base(options)
+    protected AppDbContext(DbContextOptions<TContext> options) : base(options)
     {
     }
 
@@ -26,7 +27,7 @@ public class AppDbContext : DbContext, IApplicationDbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(TContext).Assembly);
         base.OnModelCreating(modelBuilder);
     }
 

@@ -14,7 +14,7 @@ public sealed class AuditLogConfiguration : IEntityTypeConfiguration<AuditLog>
         builder.Property(x => x.Action).HasMaxLength(150).IsRequired();
         builder.Property(x => x.EntityName).HasMaxLength(150).IsRequired();
         builder.Property(x => x.EntityId).HasMaxLength(100).IsRequired();
-        builder.Property(x => x.PayloadJson).HasColumnType("nvarchar(max)").IsRequired();
+        builder.Property(x => x.PayloadJson).HasColumnType("text").IsRequired();
 
         builder.HasIndex(x => new { x.TenantId, x.CreatedAt });
     }

@@ -21,10 +21,12 @@ public static class InfrastructureServiceCollectionExtensions
         var connectionString = configuration.GetConnectionString("DefaultConnection")
             ?? throw new InvalidOperationException("DefaultConnection is not configured");
 
-        services.AddDbContext<AppDbContext>(options => options.UseSqlServer(connectionString));
-        services.AddDbContext<AdsManagerDbContext>(options => options.UseSqlServer(connectionString));
+        services.AddDbContext<AdsManagerDbContext>(options =>
+            options.UseNpgsql(connectionString));
 
-        services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<AppDbContext>());
+        services.AddScoped<IApplicationDbContext>(sp =>
+            sp.GetRequiredService<AdsManagerDbContext>());
+
         services.AddScoped<IPasswordHasher, PasswordHasher>();
         services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
 

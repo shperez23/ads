@@ -15,7 +15,7 @@ public sealed class InsightDailyConfiguration : IEntityTypeConfiguration<Insight
         builder.Property(x => x.Cpm).HasPrecision(18, 4);
         builder.Property(x => x.Cpc).HasPrecision(18, 4);
         builder.Property(x => x.Ctr).HasPrecision(18, 4);
-        builder.Property(x => x.ConversionsJson).HasColumnType("nvarchar(max)").IsRequired();
+        builder.Property(x => x.ConversionsJson).HasColumnType("text").IsRequired();
 
         builder.HasIndex(x => new { x.TenantId, x.AdAccountId, x.Date });
         builder.HasIndex(x => new { x.TenantId, x.CampaignId, x.Date });
