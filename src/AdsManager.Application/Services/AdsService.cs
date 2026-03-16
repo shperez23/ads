@@ -1,5 +1,6 @@
 using AdsManager.Application.Common;
 using AdsManager.Application.DTOs.Ads;
+using AdsManager.Application.DTOs.Common;
 using AdsManager.Application.DTOs.Meta;
 using AdsManager.Application.Interfaces;
 using AdsManager.Application.Interfaces.Meta;
@@ -29,13 +30,17 @@ public sealed class AdsService : IAdsService
         _cacheService = cacheService;
     }
 
-    public async Task<Result<IReadOnlyCollection<AdDto>>> GetAdsAsync(CancellationToken cancellationToken = default)
+    public async Task<Result<PagedResponse<AdDto>>> GetAdsAsync(AdListRequest request, CancellationToken cancellationToken = default)
     {
         if (!TryGetTenantId(out var tenantId))
-            return Result<IReadOnlyCollection<AdDto>>.Fail("Tenant no resuelto");
+            return Result<PagedResponse<AdDto>>.Fail("Tenant no resuelto");
 
-        var ads = await _adRepository.GetByTenantAsync(tenantId, cancellationToken);
-        return Result<IReadOnlyCollection<AdDto>>.Ok(ads.Select(Map).ToArray());
+        var (items, total) = await _adRepository.GetPagedByTenantAsync(tenantId, request, cancellationToken);
+        var page = request.NormalizedPage;
+        var pageSize = request.NormalizedPageSize;
+        var totalPages = (int)Math.Ceiling(total / (double)pageSize);
+
+        return Result<PagedResponse<AdDto>>.Ok(new PagedResponse<AdDto>(items.Select(Map).ToArray(), page, pageSize, total, totalPages));
     }
 
     public async Task<Result<AdDto>> GetAdByIdAsync(Guid adId, CancellationToken cancellationToken = default)

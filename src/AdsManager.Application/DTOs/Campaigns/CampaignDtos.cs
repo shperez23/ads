@@ -1,3 +1,5 @@
+using AdsManager.Application.DTOs.Common;
+
 namespace AdsManager.Application.DTOs.Campaigns;
 
 public sealed record CampaignDto(
@@ -28,3 +30,9 @@ public sealed record UpdateCampaignRequest(
     decimal? LifetimeBudget,
     DateTime? StartDate,
     DateTime? EndDate);
+
+public sealed record CampaignListRequest : PagedRequest
+{
+    public string? Status { get; init; }
+    public Guid? AdAccountId { get; init; }
+}
