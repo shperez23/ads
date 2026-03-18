@@ -10,7 +10,6 @@ namespace AdsManager.API.Controllers;
 [Authorize]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/dashboard")]
-[Route("api/dashboard")]
 public sealed class DashboardController : ControllerBase
 {
     private readonly IDashboardService _dashboardService;

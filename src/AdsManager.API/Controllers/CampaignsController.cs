@@ -11,7 +11,6 @@ namespace AdsManager.API.Controllers;
 [Authorize]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/campaigns")]
-[Route("api/campaigns")]
 public sealed class CampaignsController : ControllerBase
 {
     private readonly ICampaignService _campaignService;
