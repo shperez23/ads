@@ -11,7 +11,6 @@ namespace AdsManager.API.Controllers;
 [Authorize]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/reports")]
-[Route("api/reports")]
 public sealed class ReportsController : ControllerBase
 {
     private readonly IReportService _reportService;
@@ -38,7 +37,7 @@ public sealed class ReportsController : ControllerBase
 
     [HttpGet("dashboard")]
     [Authorize(Policy = AuthorizationPolicies.ReportsRead)]
-    [Obsolete("Use GET /api/dashboard. This endpoint will be removed in a future release.")]
+    [Obsolete("Use GET /api/v1/dashboard. This endpoint will be removed in a future release.")]
     public Task<IActionResult> GetDashboard([FromQuery] DateOnly? dateFrom, [FromQuery] DateOnly? dateTo, [FromQuery] Guid? campaignId, [FromQuery] Guid? adAccountId, CancellationToken cancellationToken)
         => DashboardEndpointHandler.HandleGetAsync(this, _dashboardService, _tenantProvider, dateFrom, dateTo, campaignId, adAccountId, cancellationToken, markAsDeprecated: true);
 }

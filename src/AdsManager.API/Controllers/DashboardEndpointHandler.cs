@@ -24,7 +24,7 @@ internal static class DashboardEndpointHandler
         if (markAsDeprecated)
         {
             controller.Response.Headers["Deprecation"] = "true";
-            controller.Response.Headers["Link"] = "</api/dashboard>; rel=\"successor-version\"";
+            controller.Response.Headers["Link"] = "</api/v1/dashboard>; rel=\"successor-version\"";
         }
 
         var filter = new DashboardFilter(dateFrom, dateTo, campaignId, adAccountId);

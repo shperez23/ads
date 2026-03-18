@@ -12,7 +12,6 @@ namespace AdsManager.API.Controllers;
 [Authorize]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/meta")]
-[Route("api/meta")]
 public sealed class MetaAdsController : ControllerBase
 {
     private readonly IMetaAdsService _metaAdsService;

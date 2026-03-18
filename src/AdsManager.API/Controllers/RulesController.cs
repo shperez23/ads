@@ -11,7 +11,6 @@ namespace AdsManager.API.Controllers;
 [Authorize]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/rules")]
-[Route("api/rules")]
 public sealed class RulesController : ControllerBase
 {
     private readonly IRuleService _ruleService;
