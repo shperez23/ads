@@ -5,7 +5,7 @@
       "launchBrowser": true,
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "ADSMANAGER_JWT_SECRET": "MCowBQYDK2VwAyEAMGrziAHrYqxgVn+yGb/niO5mhdTgQwZUIXrWnrTMjt8="
+        "ADSMANAGER_JWT_SECRET": "EAAYBvR0aPaIBQ0uEMcvZBXXE7yoZCWj0eprp1ZC1FJu7YJsLuzJ70LuvkWUpK2vbqqu1RqPyv0XZBFZAbPHZCUVl4Bl5IygW40xtHgZBt4MphmXtOexfK8A7djtnHsgyZBOUiLCifzs2WAwSxrqz8gqi3fwtSpTCfd11ZCBhFk9kIyYXXed1BjddsmgZAl7ZAZB06wH3nt4tSxmmHdBsYXeYjE41syZCuO2UN797fk0TwZArQ2AYZA3hj26zbl1NRSRArZAlDzSP984azN6dZBcNzrur960A6f8GLNC7S1HHnqQZDZD"
       },
       "applicationUrl": "https://localhost:61570;http://localhost:61571"
     }

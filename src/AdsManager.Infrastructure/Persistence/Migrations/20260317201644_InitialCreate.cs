@@ -43,7 +43,10 @@ namespace AdsManager.Infrastructure.Persistence.Migrations
                     Method = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
                     RequestJson = table.Column<string>(type: "text", nullable: false),
                     ResponseJson = table.Column<string>(type: "text", nullable: false),
+                    Status = table.Column<string>(type: "character varying(40)", maxLength: 40, nullable: false),
                     StatusCode = table.Column<int>(type: "integer", nullable: false),
+                    DurationMs = table.Column<long>(type: "bigint", nullable: false),
+                    TraceId = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
                 },
@@ -63,12 +66,52 @@ namespace AdsManager.Infrastructure.Persistence.Migrations
                     EntityName = table.Column<string>(type: "character varying(150)", maxLength: 150, nullable: false),
                     EntityId = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     PayloadJson = table.Column<string>(type: "text", nullable: false),
+                    TraceId = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_AuditLogs", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "AuthAttemptLogs",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    UserId = table.Column<Guid>(type: "uuid", nullable: true),
+                    Email = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
+                    IpAddress = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
+                    AttemptedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    Success = table.Column<bool>(type: "boolean", nullable: false),
+                    AttemptType = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    FailureReason = table.Column<string>(type: "character varying(250)", maxLength: 250, nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_AuthAttemptLogs", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "AuthLockoutStates",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    UserId = table.Column<Guid>(type: "uuid", nullable: true),
+                    Email = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
+                    IpAddress = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
+                    FailedAttempts = table.Column<int>(type: "integer", nullable: false),
+                    LastFailedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    LockoutUntil = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_AuthLockoutStates", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -112,6 +155,9 @@ namespace AdsManager.Infrastructure.Persistence.Migrations
                     TokenExpiration = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     BusinessId = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     Status = table.Column<int>(type: "integer", nullable: false),
+                    LastHealthCheckAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    LastHealthCheckStatus = table.Column<string>(type: "character varying(60)", maxLength: 60, nullable: true),
+                    LastHealthCheckDetails = table.Column<string>(type: "text", nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     DeletedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
@@ -135,6 +181,65 @@ namespace AdsManager.Infrastructure.Persistence.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Roles", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Rules",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    TenantId = table.Column<Guid>(type: "uuid", nullable: false),
+                    Name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    EntityLevel = table.Column<int>(type: "integer", nullable: false),
+                    Metric = table.Column<int>(type: "integer", nullable: false),
+                    Operator = table.Column<int>(type: "integer", nullable: false),
+                    Threshold = table.Column<decimal>(type: "numeric(18,4)", precision: 18, scale: 4, nullable: false),
+                    Action = table.Column<int>(type: "integer", nullable: false),
+                    IsActive = table.Column<bool>(type: "boolean", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Rules", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "SyncCursors",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    TenantId = table.Column<Guid>(type: "uuid", nullable: false),
+                    AdAccountId = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    EntityType = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    LastSyncedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_SyncCursors", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "SyncJobRun",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    JobName = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    TenantId = table.Column<Guid>(type: "uuid", nullable: true),
+                    AdAccountId = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
+                    LogicalKey = table.Column<string>(type: "character varying(260)", maxLength: 260, nullable: false),
+                    StartedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    FinishedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    Status = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    Error = table.Column<string>(type: "text", nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_SyncJobRun", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -182,6 +287,34 @@ namespace AdsManager.Infrastructure.Persistence.Migrations
                         principalTable: "AdAccounts",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "RuleExecutionLogs",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    RuleId = table.Column<Guid>(type: "uuid", nullable: false),
+                    TenantId = table.Column<Guid>(type: "uuid", nullable: false),
+                    ExecutedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    EntityName = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    EntityId = table.Column<Guid>(type: "uuid", nullable: false),
+                    MetricValue = table.Column<decimal>(type: "numeric(18,4)", precision: 18, scale: 4, nullable: false),
+                    ActionExecuted = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    Status = table.Column<int>(type: "integer", nullable: false),
+                    Details = table.Column<string>(type: "text", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_RuleExecutionLogs", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_RuleExecutionLogs_Rules_RuleId",
+                        column: x => x.RuleId,
+                        principalTable: "Rules",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -257,7 +390,7 @@ namespace AdsManager.Infrastructure.Persistence.Migrations
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     UserId = table.Column<Guid>(type: "uuid", nullable: false),
-                    Token = table.Column<string>(type: "character varying(300)", maxLength: 300, nullable: false),
+                    TokenHash = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
                     ExpiresAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     IsRevoked = table.Column<bool>(type: "boolean", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
@@ -371,6 +504,32 @@ namespace AdsManager.Infrastructure.Persistence.Migrations
                 columns: new[] { "TenantId", "CreatedAt" });
 
             migrationBuilder.CreateIndex(
+                name: "IX_AuthAttemptLogs_AttemptType_AttemptedAt",
+                table: "AuthAttemptLogs",
+                columns: new[] { "AttemptType", "AttemptedAt" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_AuthAttemptLogs_Email_AttemptedAt",
+                table: "AuthAttemptLogs",
+                columns: new[] { "Email", "AttemptedAt" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_AuthAttemptLogs_IpAddress_AttemptedAt",
+                table: "AuthAttemptLogs",
+                columns: new[] { "IpAddress", "AttemptedAt" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_AuthLockoutStates_Email_IpAddress",
+                table: "AuthLockoutStates",
+                columns: new[] { "Email", "IpAddress" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_AuthLockoutStates_LockoutUntil",
+                table: "AuthLockoutStates",
+                column: "LockoutUntil");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Campaigns_AdAccountId",
                 table: "Campaigns",
                 column: "AdAccountId");
@@ -397,26 +556,58 @@ namespace AdsManager.Infrastructure.Persistence.Migrations
                 columns: new[] { "TenantId", "CampaignId", "Date" });
 
             migrationBuilder.CreateIndex(
+                name: "IX_InsightsDaily_TenantId_Date_CampaignId",
+                table: "InsightsDaily",
+                columns: new[] { "TenantId", "Date", "CampaignId" });
+
+            migrationBuilder.CreateIndex(
                 name: "IX_MetaConnections_TenantId",
                 table: "MetaConnections",
                 column: "TenantId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_RefreshTokens_Token",
+                name: "IX_RefreshTokens_UserId_IsRevoked",
                 table: "RefreshTokens",
-                column: "Token",
-                unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_RefreshTokens_UserId",
-                table: "RefreshTokens",
-                column: "UserId");
+                columns: new[] { "UserId", "IsRevoked" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_Roles_Name",
                 table: "Roles",
                 column: "Name",
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_RuleExecutionLogs_RuleId",
+                table: "RuleExecutionLogs",
+                column: "RuleId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_RuleExecutionLogs_TenantId_RuleId_ExecutedAt",
+                table: "RuleExecutionLogs",
+                columns: new[] { "TenantId", "RuleId", "ExecutedAt" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Rules_TenantId_IsActive",
+                table: "Rules",
+                columns: new[] { "TenantId", "IsActive" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_SyncCursors_TenantId_AdAccountId_EntityType",
+                table: "SyncCursors",
+                columns: new[] { "TenantId", "AdAccountId", "EntityType" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_SyncJobRun_JobName_StartedAt",
+                table: "SyncJobRun",
+                columns: new[] { "JobName", "StartedAt" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_SyncJobRun_LogicalKey_Status",
+                table: "SyncJobRun",
+                columns: new[] { "LogicalKey", "Status" },
+                unique: true,
+                filter: "\"Status\" = 'Running'");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Tenants_Slug",
@@ -449,6 +640,12 @@ namespace AdsManager.Infrastructure.Persistence.Migrations
                 name: "AuditLogs");
 
             migrationBuilder.DropTable(
+                name: "AuthAttemptLogs");
+
+            migrationBuilder.DropTable(
+                name: "AuthLockoutStates");
+
+            migrationBuilder.DropTable(
                 name: "InsightsDaily");
 
             migrationBuilder.DropTable(
@@ -458,10 +655,22 @@ namespace AdsManager.Infrastructure.Persistence.Migrations
                 name: "RefreshTokens");
 
             migrationBuilder.DropTable(
+                name: "RuleExecutionLogs");
+
+            migrationBuilder.DropTable(
+                name: "SyncCursors");
+
+            migrationBuilder.DropTable(
+                name: "SyncJobRun");
+
+            migrationBuilder.DropTable(
                 name: "AdSets");
 
             migrationBuilder.DropTable(
                 name: "Users");
+
+            migrationBuilder.DropTable(
+                name: "Rules");
 
             migrationBuilder.DropTable(
                 name: "Campaigns");
