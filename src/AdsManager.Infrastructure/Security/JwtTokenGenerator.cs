@@ -19,6 +19,11 @@ public sealed class JwtTokenGenerator : IJwtTokenGenerator
 
     public string GenerateAccessToken(User user)
     {
+        if (string.IsNullOrWhiteSpace(_options.SecretKey) || Encoding.UTF8.GetByteCount(_options.SecretKey) < 32)
+        {
+            throw new InvalidOperationException("JWT secret key is not configured correctly.");
+        }
+
         var claims = new[]
         {
             new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
