@@ -1,3 +1,4 @@
+using AdsManager.Application.Common;
 using AdsManager.Application.DTOs.Insights;
 using AdsManager.Application.Interfaces;
 using AdsManager.Application.Interfaces.Services;
@@ -7,7 +8,7 @@ namespace AdsManager.API.Controllers;
 
 internal static class DashboardEndpointHandler
 {
-    public static async Task<IActionResult> HandleGetAsync(
+    public static async Task<ActionResult<Result<DashboardDto>>> HandleGetAsync(
         ControllerBase controller,
         IDashboardService dashboardService,
         ITenantProvider tenantProvider,
