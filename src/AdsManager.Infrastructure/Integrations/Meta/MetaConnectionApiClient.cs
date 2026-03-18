@@ -5,7 +5,7 @@ namespace AdsManager.Infrastructure.Integrations.Meta;
 
 public sealed class MetaConnectionApiClient : IMetaConnectionApiClient
 {
-    private const string BaseUrl = "https://graph.facebook.com/v19.0/";
+    private const string BaseUrl = "https://graph.facebook.com/v25.0/";
     private readonly HttpClient _httpClient;
 
     public MetaConnectionApiClient(HttpClient httpClient)

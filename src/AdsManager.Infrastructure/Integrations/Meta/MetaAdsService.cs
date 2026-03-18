@@ -18,7 +18,7 @@ namespace AdsManager.Infrastructure.Integrations.Meta;
 
 public sealed class MetaAdsService : IMetaAdsService
 {
-    private const string BaseUrl = "https://graph.facebook.com/v19.0/";
+    private const string BaseUrl = "https://graph.facebook.com/v25.0/";
     private const string CampaignEntityType = "Campaign";
     private const string AdSetEntityType = "AdSet";
     private const string AdEntityType = "Ad";
