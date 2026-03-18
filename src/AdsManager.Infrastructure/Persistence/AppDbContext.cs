@@ -82,7 +82,7 @@ public abstract class AppDbContext<TContext> : DbContext, IApplicationDbContext
             var contextExpression = Expression.Constant(this, typeof(AppDbContext<TContext>));
             var currentTenantIdExpression = Expression.Property(contextExpression, nameof(CurrentTenantId));
             var hasTenantExpression = Expression.Property(currentTenantIdExpression, nameof(Nullable<Guid>.HasValue));
-            var tenantValueExpression = Expression.Property(currentTenantIdExpression, nameof(Nullable<Guid>.Value));
+            var tenantValueExpression = Expression.Call(currentTenantIdExpression, typeof(Guid?).GetMethod(nameof(Nullable<Guid>.GetValueOrDefault), Type.EmptyTypes)!);
 
             var tenantMatchExpression = Expression.Equal(entityTenantId, tenantValueExpression);
             var body = Expression.OrElse(Expression.Not(hasTenantExpression), tenantMatchExpression);
