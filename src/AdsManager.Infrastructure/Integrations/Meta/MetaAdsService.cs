@@ -493,7 +493,7 @@ public sealed class MetaAdsService : IMetaAdsService
 
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
 
-        response.EnsureSuccessStatusCode();
+        ThrowIfUnsuccessful(response, json);
 
         using var doc = JsonDocument.Parse(json);
         var rootData = doc.RootElement.GetProperty("data");
@@ -521,7 +521,7 @@ public sealed class MetaAdsService : IMetaAdsService
             cancellationToken);
 
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
-        response.EnsureSuccessStatusCode();
+        ThrowIfUnsuccessful(response, json);
 
         return json;
     }
@@ -605,6 +605,46 @@ public sealed class MetaAdsService : IMetaAdsService
 
     private static bool IsTransientResponse(HttpResponseMessage response)
         => response.StatusCode == HttpStatusCode.TooManyRequests || (int)response.StatusCode >= 500;
+
+    private static void ThrowIfUnsuccessful(HttpResponseMessage response, string responseBody)
+    {
+        if (response.IsSuccessStatusCode)
+            return;
+
+        throw new HttpRequestException(BuildMetaErrorMessage(response, responseBody), null, response.StatusCode);
+    }
+
+    private static string BuildMetaErrorMessage(HttpResponseMessage response, string responseBody)
+    {
+        if (!string.IsNullOrWhiteSpace(responseBody))
+        {
+            try
+            {
+                using var document = JsonDocument.Parse(responseBody);
+                if (document.RootElement.TryGetProperty("error", out var error))
+                {
+                    var userMessage = TryGetString(error, "error_user_msg");
+                    var message = TryGetString(error, "message");
+                    var errorType = TryGetString(error, "type");
+                    var errorCode = TryGetString(error, "code");
+
+                    if (!string.IsNullOrWhiteSpace(userMessage))
+                        return userMessage;
+
+                    if (!string.IsNullOrWhiteSpace(message) && !string.IsNullOrWhiteSpace(errorType) && !string.IsNullOrWhiteSpace(errorCode))
+                        return $"{message} ({errorType} - {errorCode})";
+
+                    if (!string.IsNullOrWhiteSpace(message))
+                        return message;
+                }
+            }
+            catch (JsonException)
+            {
+            }
+        }
+
+        return $"Meta API request failed with status code {(int)response.StatusCode}.";
+    }
 
     private async Task<string> GetAccessTokenAsync(Guid tenantId, CancellationToken cancellationToken)
     {
