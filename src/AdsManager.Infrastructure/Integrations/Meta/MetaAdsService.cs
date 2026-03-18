@@ -88,21 +88,21 @@ public sealed class MetaAdsService : IMetaAdsService
         => GetDataAsync(tenantId,
             "me/adaccounts?fields=id,name,account_status,currency,timezone_name",
             e => new MetaAdAccountDto(
-                e.GetProperty("id").GetString() ?? string.Empty,
-                e.GetProperty("name").GetString() ?? string.Empty,
-                e.GetProperty("account_status").ToString(),
-                e.TryGetProperty("currency", out var currency) ? currency.GetString() ?? string.Empty : string.Empty,
-                e.TryGetProperty("timezone_name", out var tz) ? tz.GetString() ?? string.Empty : string.Empty),
+                TryGetString(e, "id"),
+                TryGetString(e, "name"),
+                TryGetString(e, "account_status"),
+                TryGetString(e, "currency"),
+                TryGetString(e, "timezone_name")),
             cancellationToken);
 
     public Task<IReadOnlyCollection<MetaCampaignDto>> GetCampaignsAsync(Guid tenantId, string adAccountId, CancellationToken cancellationToken = default)
         => GetDataAsync(tenantId,
             $"act_{adAccountId}/campaigns?fields=id,name,status,objective",
             e => new MetaCampaignDto(
-                e.GetProperty("id").GetString() ?? string.Empty,
-                e.GetProperty("name").GetString() ?? string.Empty,
-                e.GetProperty("status").GetString() ?? string.Empty,
-                e.TryGetProperty("objective", out var objective) ? objective.GetString() ?? string.Empty : string.Empty),
+                TryGetString(e, "id"),
+                TryGetString(e, "name"),
+                TryGetString(e, "status"),
+                TryGetString(e, "objective")),
             cancellationToken);
 
     public async Task<string> CreateCampaignAsync(Guid tenantId, string adAccountId, MetaCampaignCreateRequest request, CancellationToken cancellationToken = default)
@@ -196,22 +196,22 @@ public sealed class MetaAdsService : IMetaAdsService
         return GetDataAsync(tenantId,
             $"act_{adAccountId}/insights?fields=date_start,date_stop,campaign_id,campaign_name,adset_id,adset_name,ad_id,ad_name,spend,impressions,reach,clicks,ctr,cpc,cpm,actions&time_range={{\"since\":\"{since:yyyy-MM-dd}\",\"until\":\"{until:yyyy-MM-dd}\"}}&level={effectiveLevel}",
             e => new MetaInsightDto(
-                e.TryGetProperty("date_start", out var dateStart) ? dateStart.GetString() ?? string.Empty : string.Empty,
-                e.TryGetProperty("date_stop", out var dateStop) ? dateStop.GetString() ?? string.Empty : string.Empty,
-                e.TryGetProperty("campaign_id", out var campaignId) ? campaignId.GetString() ?? string.Empty : string.Empty,
-                e.TryGetProperty("campaign_name", out var campaignName) ? campaignName.GetString() ?? string.Empty : string.Empty,
-                e.TryGetProperty("adset_id", out var adSetId) ? adSetId.GetString() ?? string.Empty : string.Empty,
-                e.TryGetProperty("adset_name", out var adSetName) ? adSetName.GetString() ?? string.Empty : string.Empty,
-                e.TryGetProperty("ad_id", out var adId) ? adId.GetString() ?? string.Empty : string.Empty,
-                e.TryGetProperty("ad_name", out var adName) ? adName.GetString() ?? string.Empty : string.Empty,
-                e.TryGetProperty("spend", out var spend) ? spend.GetString() ?? "0" : "0",
-                e.TryGetProperty("impressions", out var impressions) ? impressions.GetString() ?? "0" : "0",
-                e.TryGetProperty("reach", out var reach) ? reach.GetString() ?? "0" : "0",
-                e.TryGetProperty("clicks", out var clicks) ? clicks.GetString() ?? "0" : "0",
+                TryGetString(e, "date_start"),
+                TryGetString(e, "date_stop"),
+                TryGetString(e, "campaign_id"),
+                TryGetString(e, "campaign_name"),
+                TryGetString(e, "adset_id"),
+                TryGetString(e, "adset_name"),
+                TryGetString(e, "ad_id"),
+                TryGetString(e, "ad_name"),
+                TryGetString(e, "spend", "0"),
+                TryGetString(e, "impressions", "0"),
+                TryGetString(e, "reach", "0"),
+                TryGetString(e, "clicks", "0"),
                 ParseLinkClicks(e).ToString(CultureInfo.InvariantCulture),
-                e.TryGetProperty("ctr", out var ctr) ? ctr.GetString() ?? "0" : "0",
-                e.TryGetProperty("cpc", out var cpc) ? cpc.GetString() ?? "0" : "0",
-                e.TryGetProperty("cpm", out var cpm) ? cpm.GetString() ?? "0" : "0"),
+                TryGetString(e, "ctr", "0"),
+                TryGetString(e, "cpc", "0"),
+                TryGetString(e, "cpm", "0")),
             cancellationToken);
     }
 
@@ -222,10 +222,10 @@ public sealed class MetaAdsService : IMetaAdsService
         var campaigns = await GetDataAsync(tenantId,
             $"act_{adAccountId}/campaigns?fields=id,name,status,objective&updated_since={new DateTimeOffset(cursor.LastSyncedAt).ToUnixTimeSeconds()}",
             e => new MetaCampaignDto(
-                e.GetProperty("id").GetString() ?? string.Empty,
-                e.GetProperty("name").GetString() ?? string.Empty,
-                e.GetProperty("status").GetString() ?? string.Empty,
-                e.TryGetProperty("objective", out var objective) ? objective.GetString() ?? string.Empty : string.Empty),
+                TryGetString(e, "id"),
+                TryGetString(e, "name"),
+                TryGetString(e, "status"),
+                TryGetString(e, "objective")),
             cancellationToken);
 
         foreach (var campaign in campaigns)
@@ -267,10 +267,10 @@ public sealed class MetaAdsService : IMetaAdsService
             var adSets = await GetDataAsync(tenantId,
                 $"{campaign.MetaCampaignId}/adsets?fields=id,campaign_id,name,status,daily_budget,billing_event,optimization_goal,targeting&updated_since={new DateTimeOffset(cursor.LastSyncedAt).ToUnixTimeSeconds()}",
                 e => new MetaAdSetDto(
-                    e.GetProperty("id").GetString() ?? string.Empty,
-                    e.TryGetProperty("campaign_id", out var campaignId) ? campaignId.GetString() ?? string.Empty : string.Empty,
-                    e.GetProperty("name").GetString() ?? string.Empty,
-                    e.TryGetProperty("status", out var status) ? status.GetString() ?? string.Empty : string.Empty,
+                    TryGetString(e, "id"),
+                    TryGetString(e, "campaign_id"),
+                    TryGetString(e, "name"),
+                    TryGetString(e, "status"),
                     TryGetDecimal(e, "daily_budget"),
                     TryGetString(e, "billing_event"),
                     TryGetString(e, "optimization_goal"),
@@ -324,7 +324,7 @@ public sealed class MetaAdsService : IMetaAdsService
             var ads = await GetDataAsync(tenantId,
                 $"{adSet.MetaAdSetId}/ads?fields=id,adset_id,name,status,creative&updated_since={new DateTimeOffset(cursor.LastSyncedAt).ToUnixTimeSeconds()}",
                 e => new MetaAdDto(
-                    e.GetProperty("id").GetString() ?? string.Empty,
+                    TryGetString(e, "id"),
                     TryGetString(e, "adset_id"),
                     TryGetString(e, "name"),
                     TryGetString(e, "status"),
@@ -472,7 +472,7 @@ public sealed class MetaAdsService : IMetaAdsService
             if (!action.TryGetProperty("value", out var value))
                 continue;
 
-            if (long.TryParse(value.GetString(), NumberStyles.Any, CultureInfo.InvariantCulture, out var parsed))
+            if (long.TryParse(ConvertJsonElementToString(value), NumberStyles.Any, CultureInfo.InvariantCulture, out var parsed))
                 return parsed;
         }
 
@@ -504,7 +504,7 @@ public sealed class MetaAdsService : IMetaAdsService
     {
         var json = await PostAsync(tenantId, endpoint, body, cancellationToken);
         using var doc = JsonDocument.Parse(json);
-        return doc.RootElement.GetProperty("id").GetString() ?? string.Empty;
+        return TryGetString(doc.RootElement, "id");
     }
 
     private async Task<string> PostAsync(Guid tenantId, string endpoint, Dictionary<string, string> body, CancellationToken cancellationToken)
@@ -757,8 +757,20 @@ public sealed class MetaAdsService : IMetaAdsService
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    private static string TryGetString(JsonElement element, string propertyName)
-        => element.TryGetProperty(propertyName, out var value) ? value.GetString() ?? string.Empty : string.Empty;
+    private static string TryGetString(JsonElement element, string propertyName, string defaultValue = "")
+        => element.TryGetProperty(propertyName, out var value) ? ConvertJsonElementToString(value, defaultValue) : defaultValue;
+
+    private static string ConvertJsonElementToString(JsonElement value, string defaultValue = "")
+        => value.ValueKind switch
+        {
+            JsonValueKind.String => value.GetString() ?? defaultValue,
+            JsonValueKind.Number => value.ToString(),
+            JsonValueKind.True => bool.TrueString,
+            JsonValueKind.False => bool.FalseString,
+            JsonValueKind.Object or JsonValueKind.Array => value.GetRawText(),
+            JsonValueKind.Null or JsonValueKind.Undefined => defaultValue,
+            _ => value.ToString()
+        };
 
     private static decimal TryGetDecimal(JsonElement element, string propertyName)
         => decimal.TryParse(TryGetString(element, propertyName), NumberStyles.Any, CultureInfo.InvariantCulture, out var value) ? value : 0;
