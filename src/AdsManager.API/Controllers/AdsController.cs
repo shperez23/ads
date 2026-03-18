@@ -11,7 +11,6 @@ namespace AdsManager.API.Controllers;
 [Authorize]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/ads")]
-[Route("api/ads")]
 public sealed class AdsController : ControllerBase
 {
     private readonly IAdsService _adsService;
