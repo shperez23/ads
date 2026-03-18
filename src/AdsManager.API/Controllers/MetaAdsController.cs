@@ -1,10 +1,10 @@
+using AdsManager.API.Authorization;
 using AdsManager.Application.DTOs.Meta;
 using AdsManager.Application.Interfaces;
 using AdsManager.Application.Interfaces.Meta;
 using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using AdsManager.API.Authorization;
 
 namespace AdsManager.API.Controllers;
 
@@ -25,7 +25,9 @@ public sealed class MetaAdsController : ControllerBase
 
     [HttpGet("ad-accounts")]
     [Authorize(Policy = AuthorizationPolicies.AdAccountsManage)]
-    public async Task<IActionResult> GetAdAccounts(CancellationToken cancellationToken)
+    [ProducesResponseType(typeof(IReadOnlyCollection<MetaAdAccountDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<IReadOnlyCollection<MetaAdAccountDto>>> GetAdAccounts(CancellationToken cancellationToken)
     {
         var tenantId = _tenantProvider.GetTenantId();
         if (!tenantId.HasValue)
@@ -37,7 +39,9 @@ public sealed class MetaAdsController : ControllerBase
 
     [HttpGet("ad-accounts/{adAccountId}/campaigns")]
     [Authorize(Policy = AuthorizationPolicies.CampaignsRead)]
-    public async Task<IActionResult> GetCampaigns([FromRoute] string adAccountId, CancellationToken cancellationToken)
+    [ProducesResponseType(typeof(IReadOnlyCollection<MetaCampaignDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<IReadOnlyCollection<MetaCampaignDto>>> GetCampaigns([FromRoute] string adAccountId, CancellationToken cancellationToken)
     {
         var tenantId = _tenantProvider.GetTenantId();
         if (!tenantId.HasValue)
@@ -49,19 +53,23 @@ public sealed class MetaAdsController : ControllerBase
 
     [HttpPost("ad-accounts/{adAccountId}/campaigns")]
     [Authorize(Policy = AuthorizationPolicies.CampaignsWrite)]
-    public async Task<IActionResult> CreateCampaign([FromRoute] string adAccountId, [FromBody] MetaCampaignCreateRequest request, CancellationToken cancellationToken)
+    [ProducesResponseType(typeof(MetaResourceIdentifierDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<MetaResourceIdentifierDto>> CreateCampaign([FromRoute] string adAccountId, [FromBody] MetaCampaignCreateRequest request, CancellationToken cancellationToken)
     {
         var tenantId = _tenantProvider.GetTenantId();
         if (!tenantId.HasValue)
             return Unauthorized();
 
         var id = await _metaAdsService.CreateCampaignAsync(tenantId.Value, adAccountId, request, cancellationToken);
-        return Ok(new { id });
+        return Ok(new MetaResourceIdentifierDto(id));
     }
 
     [HttpPatch("campaigns/status")]
     [Authorize(Policy = AuthorizationPolicies.CampaignsWrite)]
-    public async Task<IActionResult> UpdateCampaignStatus([FromBody] MetaCampaignStatusUpdateRequest request, CancellationToken cancellationToken)
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult> UpdateCampaignStatus([FromBody] MetaCampaignStatusUpdateRequest request, CancellationToken cancellationToken)
     {
         var tenantId = _tenantProvider.GetTenantId();
         if (!tenantId.HasValue)
@@ -73,31 +81,37 @@ public sealed class MetaAdsController : ControllerBase
 
     [HttpPost("ad-accounts/{adAccountId}/adsets")]
     [Authorize(Policy = AuthorizationPolicies.AdSetsWrite)]
-    public async Task<IActionResult> CreateAdSet([FromRoute] string adAccountId, [FromBody] MetaAdSetCreateRequest request, CancellationToken cancellationToken)
+    [ProducesResponseType(typeof(MetaResourceIdentifierDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<MetaResourceIdentifierDto>> CreateAdSet([FromRoute] string adAccountId, [FromBody] MetaAdSetCreateRequest request, CancellationToken cancellationToken)
     {
         var tenantId = _tenantProvider.GetTenantId();
         if (!tenantId.HasValue)
             return Unauthorized();
 
         var id = await _metaAdsService.CreateAdSetAsync(tenantId.Value, adAccountId, request, cancellationToken);
-        return Ok(new { id });
+        return Ok(new MetaResourceIdentifierDto(id));
     }
 
     [HttpPost("ads")]
     [Authorize(Policy = AuthorizationPolicies.AdsWrite)]
-    public async Task<IActionResult> CreateAd([FromBody] MetaAdCreateRequest request, CancellationToken cancellationToken)
+    [ProducesResponseType(typeof(MetaResourceIdentifierDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<MetaResourceIdentifierDto>> CreateAd([FromBody] MetaAdCreateRequest request, CancellationToken cancellationToken)
     {
         var tenantId = _tenantProvider.GetTenantId();
         if (!tenantId.HasValue)
             return Unauthorized();
 
         var id = await _metaAdsService.CreateAdAsync(tenantId.Value, request, cancellationToken);
-        return Ok(new { id });
+        return Ok(new MetaResourceIdentifierDto(id));
     }
 
     [HttpGet("ad-accounts/{adAccountId}/insights")]
     [Authorize(Policy = AuthorizationPolicies.ReportsRead)]
-    public async Task<IActionResult> GetInsights([FromRoute] string adAccountId, [FromQuery] DateOnly since, [FromQuery] DateOnly until, [FromQuery] string? level, CancellationToken cancellationToken)
+    [ProducesResponseType(typeof(IReadOnlyCollection<MetaInsightDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<IReadOnlyCollection<MetaInsightDto>>> GetInsights([FromRoute] string adAccountId, [FromQuery] DateOnly since, [FromQuery] DateOnly until, [FromQuery] string? level, CancellationToken cancellationToken)
     {
         var tenantId = _tenantProvider.GetTenantId();
         if (!tenantId.HasValue)
