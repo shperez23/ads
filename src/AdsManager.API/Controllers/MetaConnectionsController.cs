@@ -1,9 +1,10 @@
+using AdsManager.API.Authorization;
+using AdsManager.Application.Common;
 using AdsManager.Application.DTOs.Meta;
 using AdsManager.Application.Interfaces;
 using AdsManager.Application.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using AdsManager.API.Authorization;
 
 namespace AdsManager.API.Controllers;
 
@@ -24,7 +25,9 @@ public sealed class MetaConnectionsController : ControllerBase
 
     [HttpGet]
     [Authorize(Policy = AuthorizationPolicies.MetaConnectionsManage)]
-    public async Task<IActionResult> GetConnections(CancellationToken cancellationToken)
+    [ProducesResponseType(typeof(Result<IReadOnlyCollection<MetaConnectionDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<Result<IReadOnlyCollection<MetaConnectionDto>>>> GetConnections(CancellationToken cancellationToken)
     {
         if (!_tenantProvider.GetTenantId().HasValue)
             return Unauthorized();
@@ -35,7 +38,10 @@ public sealed class MetaConnectionsController : ControllerBase
 
     [HttpPost]
     [Authorize(Policy = AuthorizationPolicies.MetaConnectionsManage)]
-    public async Task<IActionResult> CreateConnection([FromBody] CreateMetaConnectionRequest request, CancellationToken cancellationToken)
+    [ProducesResponseType(typeof(Result<MetaConnectionDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Result<MetaConnectionDto>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<Result<MetaConnectionDto>>> CreateConnection([FromBody] CreateMetaConnectionRequest request, CancellationToken cancellationToken)
     {
         if (!_tenantProvider.GetTenantId().HasValue)
             return Unauthorized();
@@ -46,7 +52,10 @@ public sealed class MetaConnectionsController : ControllerBase
 
     [HttpPut("{id:guid}")]
     [Authorize(Policy = AuthorizationPolicies.MetaConnectionsManage)]
-    public async Task<IActionResult> UpdateConnection([FromRoute] Guid id, [FromBody] UpdateMetaConnectionRequest request, CancellationToken cancellationToken)
+    [ProducesResponseType(typeof(Result<MetaConnectionDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Result<MetaConnectionDto>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<Result<MetaConnectionDto>>> UpdateConnection([FromRoute] Guid id, [FromBody] UpdateMetaConnectionRequest request, CancellationToken cancellationToken)
     {
         if (!_tenantProvider.GetTenantId().HasValue)
             return Unauthorized();
@@ -57,7 +66,10 @@ public sealed class MetaConnectionsController : ControllerBase
 
     [HttpDelete("{id:guid}")]
     [Authorize(Policy = AuthorizationPolicies.MetaConnectionsManage)]
-    public async Task<IActionResult> DeleteConnection([FromRoute] Guid id, CancellationToken cancellationToken)
+    [ProducesResponseType(typeof(Result<bool>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Result<bool>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<Result<bool>>> DeleteConnection([FromRoute] Guid id, CancellationToken cancellationToken)
     {
         if (!_tenantProvider.GetTenantId().HasValue)
             return Unauthorized();
@@ -66,10 +78,12 @@ public sealed class MetaConnectionsController : ControllerBase
         return result.Success ? Ok(result) : NotFound(result);
     }
 
-
     [HttpPost("{id:guid}/refresh-token")]
     [Authorize(Policy = AuthorizationPolicies.MetaConnectionsManage)]
-    public async Task<IActionResult> RefreshToken([FromRoute] Guid id, CancellationToken cancellationToken)
+    [ProducesResponseType(typeof(Result<MetaConnectionTokenRefreshResultDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Result<MetaConnectionTokenRefreshResultDto>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<Result<MetaConnectionTokenRefreshResultDto>>> RefreshToken([FromRoute] Guid id, CancellationToken cancellationToken)
     {
         if (!_tenantProvider.GetTenantId().HasValue)
             return Unauthorized();
@@ -80,7 +94,10 @@ public sealed class MetaConnectionsController : ControllerBase
 
     [HttpPost("{id:guid}/validate")]
     [Authorize(Policy = AuthorizationPolicies.MetaConnectionsManage)]
-    public async Task<IActionResult> ValidateConnection([FromRoute] Guid id, CancellationToken cancellationToken)
+    [ProducesResponseType(typeof(Result<MetaConnectionValidationResultDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Result<MetaConnectionValidationResultDto>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<Result<MetaConnectionValidationResultDto>>> ValidateConnection([FromRoute] Guid id, CancellationToken cancellationToken)
     {
         if (!_tenantProvider.GetTenantId().HasValue)
             return Unauthorized();

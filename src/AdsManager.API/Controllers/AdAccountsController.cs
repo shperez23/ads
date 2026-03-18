@@ -1,9 +1,11 @@
+using AdsManager.API.Authorization;
+using AdsManager.Application.Common;
+using AdsManager.Application.DTOs.AdAccounts;
+using AdsManager.Application.DTOs.Common;
 using AdsManager.Application.Interfaces;
 using AdsManager.Application.Interfaces.Services;
-using AdsManager.Application.DTOs.AdAccounts;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using AdsManager.API.Authorization;
 
 namespace AdsManager.API.Controllers;
 
@@ -24,7 +26,9 @@ public sealed class AdAccountsController : ControllerBase
 
     [HttpGet]
     [Authorize(Policy = AuthorizationPolicies.AdAccountsManage)]
-    public async Task<IActionResult> GetAll([FromQuery] AdAccountListRequest request, CancellationToken cancellationToken)
+    [ProducesResponseType(typeof(Result<PagedResponse<AdAccountDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<Result<PagedResponse<AdAccountDto>>>> GetAll([FromQuery] AdAccountListRequest request, CancellationToken cancellationToken)
     {
         if (!_tenantProvider.GetTenantId().HasValue)
             return Unauthorized();
@@ -35,7 +39,10 @@ public sealed class AdAccountsController : ControllerBase
 
     [HttpPost("import-from-meta")]
     [Authorize(Policy = AuthorizationPolicies.AdAccountsManage)]
-    public async Task<IActionResult> ImportFromMeta(CancellationToken cancellationToken)
+    [ProducesResponseType(typeof(Result<IReadOnlyCollection<AdAccountDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Result<IReadOnlyCollection<AdAccountDto>>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<Result<IReadOnlyCollection<AdAccountDto>>>> ImportFromMeta(CancellationToken cancellationToken)
     {
         if (!_tenantProvider.GetTenantId().HasValue)
             return Unauthorized();
@@ -46,7 +53,10 @@ public sealed class AdAccountsController : ControllerBase
 
     [HttpPost("{id:guid}/sync")]
     [Authorize(Policy = AuthorizationPolicies.AdAccountsManage)]
-    public async Task<IActionResult> Sync([FromRoute] Guid id, CancellationToken cancellationToken)
+    [ProducesResponseType(typeof(Result<string>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Result<string>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<Result<string>>> Sync([FromRoute] Guid id, CancellationToken cancellationToken)
     {
         if (!_tenantProvider.GetTenantId().HasValue)
             return Unauthorized();

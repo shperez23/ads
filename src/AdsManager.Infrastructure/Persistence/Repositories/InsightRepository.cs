@@ -68,24 +68,37 @@ public sealed class InsightRepository : IInsightRepository
     }
 
     public async Task<IReadOnlyCollection<TopCampaignDto>> GetTopCampaignsAsync(Guid tenantId, DashboardFilter filter, int take, CancellationToken cancellationToken = default)
-        => await BuildDashboardQuery(tenantId, filter)
+    {
+        var topCampaigns = await BuildDashboardQuery(tenantId, filter)
             .Where(x => x.CampaignId.HasValue)
             .Join(_dbContext.Campaigns.AsNoTracking(),
                 insight => insight.CampaignId!.Value,
                 campaign => campaign.Id,
                 (insight, campaign) => new { campaign.Id, campaign.Name, insight.Spend, insight.Clicks, insight.Impressions })
             .GroupBy(x => new { x.Id, x.Name })
-            .Select(g => new TopCampaignDto(
+            .Select(g => new
+            {
                 g.Key.Id,
                 g.Key.Name,
-                g.Sum(x => x.Spend),
-                g.Sum(x => x.Clicks),
-                g.Sum(x => x.Impressions) == 0
-                    ? 0
-                    : decimal.Round((decimal)g.Sum(x => x.Clicks) / g.Sum(x => x.Impressions) * 100, 2)))
+                Spend = g.Sum(x => x.Spend),
+                Clicks = g.Sum(x => x.Clicks),
+                Impressions = g.Sum(x => x.Impressions)
+            })
             .OrderByDescending(x => x.Spend)
             .Take(take)
             .ToArrayAsync(cancellationToken);
+
+        return topCampaigns
+            .Select(x => new TopCampaignDto(
+                x.Id,
+                x.Name,
+                x.Spend,
+                x.Clicks,
+                x.Impressions == 0
+                    ? 0
+                    : decimal.Round((decimal)x.Clicks / x.Impressions * 100, 2)))
+            .ToArray();
+    }
 
     public async Task AddRangeAsync(IEnumerable<InsightDaily> insights, CancellationToken cancellationToken = default)
     {

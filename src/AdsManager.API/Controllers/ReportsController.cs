@@ -1,9 +1,11 @@
+using AdsManager.API.Authorization;
+using AdsManager.Application.Common;
+using AdsManager.Application.DTOs.Common;
 using AdsManager.Application.DTOs.Insights;
 using AdsManager.Application.Interfaces;
 using AdsManager.Application.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using AdsManager.API.Authorization;
 
 namespace AdsManager.API.Controllers;
 
@@ -26,7 +28,9 @@ public sealed class ReportsController : ControllerBase
 
     [HttpGet("insights")]
     [Authorize(Policy = AuthorizationPolicies.ReportsRead)]
-    public async Task<IActionResult> GetInsights([FromQuery] InsightListRequest request, CancellationToken cancellationToken)
+    [ProducesResponseType(typeof(Result<PagedResponse<InsightDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<Result<PagedResponse<InsightDto>>>> GetInsights([FromQuery] InsightListRequest request, CancellationToken cancellationToken)
     {
         if (!_tenantProvider.GetTenantId().HasValue)
             return Unauthorized();
@@ -38,6 +42,8 @@ public sealed class ReportsController : ControllerBase
     [HttpGet("dashboard")]
     [Authorize(Policy = AuthorizationPolicies.ReportsRead)]
     [Obsolete("Use GET /api/v1/dashboard. This endpoint will be removed in a future release.")]
-    public Task<IActionResult> GetDashboard([FromQuery] DateOnly? dateFrom, [FromQuery] DateOnly? dateTo, [FromQuery] Guid? campaignId, [FromQuery] Guid? adAccountId, CancellationToken cancellationToken)
+    [ProducesResponseType(typeof(Result<DashboardDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public Task<ActionResult<Result<DashboardDto>>> GetDashboard([FromQuery] DateOnly? dateFrom, [FromQuery] DateOnly? dateTo, [FromQuery] Guid? campaignId, [FromQuery] Guid? adAccountId, CancellationToken cancellationToken)
         => DashboardEndpointHandler.HandleGetAsync(this, _dashboardService, _tenantProvider, dateFrom, dateTo, campaignId, adAccountId, cancellationToken, markAsDeprecated: true);
 }

@@ -1,9 +1,12 @@
+using AdsManager.API.Authorization;
+using AdsManager.Application.Common;
 using AdsManager.Application.DTOs.AdSets;
+using AdsManager.Application.DTOs.Common;
+using AdsManager.Application.DTOs.Insights;
 using AdsManager.Application.Interfaces;
 using AdsManager.Application.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using AdsManager.API.Authorization;
 
 namespace AdsManager.API.Controllers;
 
@@ -26,7 +29,9 @@ public sealed class AdSetsController : ControllerBase
 
     [HttpGet]
     [Authorize(Policy = AuthorizationPolicies.AdSetsRead)]
-    public async Task<IActionResult> GetAdSets([FromQuery] AdSetListRequest request, CancellationToken cancellationToken)
+    [ProducesResponseType(typeof(Result<PagedResponse<AdSetDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<Result<PagedResponse<AdSetDto>>>> GetAdSets([FromQuery] AdSetListRequest request, CancellationToken cancellationToken)
     {
         if (!_tenantProvider.GetTenantId().HasValue)
             return Unauthorized();
@@ -37,7 +42,10 @@ public sealed class AdSetsController : ControllerBase
 
     [HttpGet("{id:guid}")]
     [Authorize(Policy = AuthorizationPolicies.AdSetsRead)]
-    public async Task<IActionResult> GetAdSetById([FromRoute] Guid id, CancellationToken cancellationToken)
+    [ProducesResponseType(typeof(Result<AdSetDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Result<AdSetDto>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<Result<AdSetDto>>> GetAdSetById([FromRoute] Guid id, CancellationToken cancellationToken)
     {
         if (!_tenantProvider.GetTenantId().HasValue)
             return Unauthorized();
@@ -46,10 +54,12 @@ public sealed class AdSetsController : ControllerBase
         return result.Success ? Ok(result) : NotFound(result);
     }
 
-
     [HttpGet("{id:guid}/insights")]
     [Authorize(Policy = AuthorizationPolicies.ReportsRead)]
-    public async Task<IActionResult> GetInsightsByAdSet([FromRoute] Guid id, [FromQuery] DateOnly? dateFrom, [FromQuery] DateOnly? dateTo, CancellationToken cancellationToken)
+    [ProducesResponseType(typeof(Result<IReadOnlyCollection<InsightDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Result<IReadOnlyCollection<InsightDto>>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<Result<IReadOnlyCollection<InsightDto>>>> GetInsightsByAdSet([FromRoute] Guid id, [FromQuery] DateOnly? dateFrom, [FromQuery] DateOnly? dateTo, CancellationToken cancellationToken)
     {
         if (!_tenantProvider.GetTenantId().HasValue)
             return Unauthorized();
@@ -60,7 +70,10 @@ public sealed class AdSetsController : ControllerBase
 
     [HttpPost]
     [Authorize(Policy = AuthorizationPolicies.AdSetsWrite)]
-    public async Task<IActionResult> Create([FromBody] CreateAdSetRequest request, CancellationToken cancellationToken)
+    [ProducesResponseType(typeof(Result<AdSetDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Result<AdSetDto>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<Result<AdSetDto>>> Create([FromBody] CreateAdSetRequest request, CancellationToken cancellationToken)
     {
         if (!_tenantProvider.GetTenantId().HasValue)
             return Unauthorized();
@@ -71,7 +84,10 @@ public sealed class AdSetsController : ControllerBase
 
     [HttpPut("{id:guid}")]
     [Authorize(Policy = AuthorizationPolicies.AdSetsWrite)]
-    public async Task<IActionResult> UpdateAdSet([FromRoute] Guid id, [FromBody] UpdateAdSetRequest request, CancellationToken cancellationToken)
+    [ProducesResponseType(typeof(Result<AdSetDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Result<AdSetDto>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<Result<AdSetDto>>> UpdateAdSet([FromRoute] Guid id, [FromBody] UpdateAdSetRequest request, CancellationToken cancellationToken)
     {
         if (!_tenantProvider.GetTenantId().HasValue)
             return Unauthorized();
@@ -82,7 +98,10 @@ public sealed class AdSetsController : ControllerBase
 
     [HttpPut("{id:guid}/pause")]
     [Authorize(Policy = AuthorizationPolicies.AdSetsWrite)]
-    public async Task<IActionResult> PauseAdSet([FromRoute] Guid id, CancellationToken cancellationToken)
+    [ProducesResponseType(typeof(Result<AdSetDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Result<AdSetDto>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<Result<AdSetDto>>> PauseAdSet([FromRoute] Guid id, CancellationToken cancellationToken)
     {
         if (!_tenantProvider.GetTenantId().HasValue)
             return Unauthorized();
@@ -93,7 +112,10 @@ public sealed class AdSetsController : ControllerBase
 
     [HttpPut("{id:guid}/activate")]
     [Authorize(Policy = AuthorizationPolicies.AdSetsWrite)]
-    public async Task<IActionResult> ActivateAdSet([FromRoute] Guid id, CancellationToken cancellationToken)
+    [ProducesResponseType(typeof(Result<AdSetDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Result<AdSetDto>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<Result<AdSetDto>>> ActivateAdSet([FromRoute] Guid id, CancellationToken cancellationToken)
     {
         if (!_tenantProvider.GetTenantId().HasValue)
             return Unauthorized();

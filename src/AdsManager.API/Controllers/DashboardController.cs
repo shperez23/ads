@@ -1,8 +1,10 @@
+using AdsManager.API.Authorization;
+using AdsManager.Application.Common;
+using AdsManager.Application.DTOs.Insights;
 using AdsManager.Application.Interfaces;
 using AdsManager.Application.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using AdsManager.API.Authorization;
 
 namespace AdsManager.API.Controllers;
 
@@ -23,6 +25,8 @@ public sealed class DashboardController : ControllerBase
 
     [HttpGet]
     [Authorize(Policy = AuthorizationPolicies.ReportsRead)]
-    public Task<IActionResult> Get([FromQuery] DateOnly? dateFrom, [FromQuery] DateOnly? dateTo, [FromQuery] Guid? campaignId, [FromQuery] Guid? adAccountId, CancellationToken cancellationToken)
+    [ProducesResponseType(typeof(Result<DashboardDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public Task<ActionResult<Result<DashboardDto>>> Get([FromQuery] DateOnly? dateFrom, [FromQuery] DateOnly? dateTo, [FromQuery] Guid? campaignId, [FromQuery] Guid? adAccountId, CancellationToken cancellationToken)
         => DashboardEndpointHandler.HandleGetAsync(this, _dashboardService, _tenantProvider, dateFrom, dateTo, campaignId, adAccountId, cancellationToken);
 }
